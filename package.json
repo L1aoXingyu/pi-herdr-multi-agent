@@ -1,0 +1,42 @@
+{
+  "name": "pi-herdr-multi-agent",
+  "version": "0.1.0",
+  "description": "Multi-model interactive Pi TUI fleets via Herdr — launch, watchdog harvest, auto-close",
+  "type": "module",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "pi-coding-agent",
+    "herdr",
+    "multi-agent",
+    "review",
+    "skill"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "pi": {
+    "skills": [
+      "./skills"
+    ]
+  },
+  "files": [
+    "skills",
+    "README.md",
+    "package.json",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "bash tests/smoke.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/L1aoXingyu/pi-herdr-multi-agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/L1aoXingyu/pi-herdr-multi-agent/issues"
+  },
+  "homepage": "https://github.com/L1aoXingyu/pi-herdr-multi-agent#readme",
+  "author": "L1aoXingyu"
+}
