@@ -1,0 +1,25 @@
+# Example fleet file — copy and edit, then:
+#   bash launch.sh ... --fleet-file ./my-fleet.txt
+#
+# Format: shortname=provider/model[:thinking]
+# shortname must match ^[a-z][a-z0-9_-]{0,31}$ (will be namespaced under --label).
+#
+# Discover models:
+#   pi --list-models
+#   pi --list-models deepseek
+
+# Minimal 3-model example (replace with models you actually have):
+# rev-a=openai-codex/gpt-5.6-sol:xhigh
+# rev-b=deepseek/deepseek-v4-flash:max
+# rev-c=anthropic/claude-sonnet-4:high
+
+# Author's usual nine (same as fleet.defaults) — only works if configured:
+gpt56sol=openai-codex/gpt-5.6-sol:xhigh
+k3=opencode-go/kimi-k3:max
+qwen38max=opencode-go/qwen3.8-max:max
+mimopro=opencode-go/mimo-v2.5-pro:max
+hy3=opencode-go/hy3:max
+dsv4pro=siliconflow/deepseek-ai/DeepSeek-V4-Pro:high
+dsv4flash=deepseek/deepseek-v4-flash:max
+glm52=siliconflow/zai-org/GLM-5.2:max
+k27code=siliconflow/moonshotai/Kimi-K2.7-Code:high

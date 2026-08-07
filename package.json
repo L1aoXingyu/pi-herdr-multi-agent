@@ -1,7 +1,7 @@
 {
   "name": "pi-herdr-multi-agent",
-  "version": "0.1.0",
-  "description": "Multi-model interactive Pi TUI fleets via Herdr — launch, watchdog harvest, auto-close",
+  "version": "0.1.1",
+  "description": "Multi-model interactive Pi TUI fleets via Herdr \u2014 launch, watchdog harvest, auto-close",
   "type": "module",
   "keywords": [
     "pi-package",
@@ -28,7 +28,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "bash tests/smoke.sh"
+    "test": "bash tests/smoke.sh && python3 tests/test_verdict_lib.py"
   },
   "repository": {
     "type": "git",

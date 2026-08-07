@@ -10,6 +10,7 @@ Prefer this over headless `pi-subagents` when **TUI visibility** matters. Prefer
 
 - [pi](https://pi.dev) coding agent
 - [Herdr](https://github.com/herdrdev/herdr) **≥ 0.7.5** (`herdr` on `PATH`, server running) — tested on 0.8.x
+- `python3` and `bash` on `PATH` (scripts avoid bash-4-only `mapfile` / GNU `readlink -f`)
 - Model providers already configured in your pi auth / `models.json`
 
 ## Install
@@ -34,12 +35,14 @@ pi install /absolute/path/to/pi-herdr-multi-agent
 | `launch.sh` | Create tab, split panes, serial `agent start`, prompt fanout |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Example default model list (`name=provider/model[:thinking]`) |
+| `fleet.defaults` | Author default model list (`name=provider/model[:thinking]`) |
+| `fleet.example` | Copy-paste template for your own fleet |
+| `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
 
 ## Quick start (operator / agent)
 
 ```bash
-SKILL_DIR="$(pi list 2>/dev/null | true)"  # or path to skills/herdr-multi-agent
+# Directory that contains SKILL.md (package checkout or pi git install path)
 SKILL_DIR=/path/to/pi-herdr-multi-agent/skills/herdr-multi-agent
 OUTDIR=/tmp/herdr-multi-my-review
 mkdir -p "$OUTDIR"
@@ -76,13 +79,17 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is an **example** multi-model set. Override it:
+Shipped `fleet.defaults` is the **author's usual nine** and will fail preflight on machines
+without those providers. For third-party use:
 
-1. Edit `skills/herdr-multi-agent/fleet.defaults`, or
+1. Copy `skills/herdr-multi-agent/fleet.example` → your own file and edit, or
 2. Pass `--fleet-file PATH`, or
 3. Pass one or more `--agent name=provider/model[:thinking]`
 
-Every model id must already work with your pi install. There is no credential bundling in this package.
+Discover models with `pi --list-models`. `launch.sh` preflights fleet entries against that
+list (override with `--skip-model-preflight` only if you know what you're doing).
+
+There is no credential bundling in this package.
 
 ## Design notes (production hard rules)
 
@@ -127,6 +134,37 @@ Keep both. Do not replace this skill with the official one for multi-model revie
 - Never `herdr server stop` from this workflow
 - Never print secrets from env/auth while launching
 - Review-only prompts are read-only unless the user explicitly wants writers
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `model preflight failed` | `pi --list-models`, then fix `--agent` / `--fleet-file` (or auth) |
+| `prompt-file must contain 'VERDICT:'` | Add the harvest trailer to `prompt.txt` (see skill SOP) |
+| `agent_pane_busy` | Normal; launch retries. If stuck, check pane is a bare shell |
+| Watchdog `NO_VALID_VERDICT` | Agent never emitted trailer, or only echoed the prompt template — steer once / write `verdict.md` |
+| `close.sh` refuses | Partial run; inspect `results/summary.txt`, then `--force` if you still want to close |
+| Orphan tab after crashed launch | `tab_id` in outdir / `launch_exit.json`; `close.sh --outdir ... --force` |
+
+See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
+
+## Changelog
+
+### 0.1.1
+
+- Strict VERDICT harvest (`verdict_lib.py`) — rejects prompt-template echoes; prefers assistant session text
+- Model preflight via `pi --list-models`; `--skip-model-preflight` escape hatch
+- Fail-closed watchdog/close (skip `start_failed`; exit 1 if zero/partial valid verdicts)
+- Watchdog stall detection + `results/progress.json`
+- `herdr_name` length clamp fix; pass clamped name to `pi --name`
+- Busy vs hard-fail start retries; prompt status no longer succeeds on perpetual `missing`/`unknown`
+- Prompt must contain `VERDICT:`; `--force` clears stale results/verdicts
+- Launch exit breadcrumb for orphan tabs; `--kind` override; bash3-portable row loading
+- `fleet.example` + README troubleshooting
+
+### 0.1.0
+
+- Initial public skill package
 
 ## License
 

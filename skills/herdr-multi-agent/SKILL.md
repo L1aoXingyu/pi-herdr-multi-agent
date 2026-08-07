@@ -166,7 +166,7 @@ Official:
 9. **Watchdog never closes panes/tabs.** Only the main agent closes, and only after synthesis
    (or explicit user cleanup), following the auto-close policy below.
 10. **`done` counts as terminal** the same as `idle`; `unknown` does not; `blocked` is terminal-ish but keep tab.
-11. **Harvest via `agent read --source recent-unwrapped` first**, then session extract, then pane read.
+11. **Harvest via `agent read --source recent-unwrapped` first**, then **assistant-only** session extract + `verdict_lib.py` strict trailer (not raw `VERDICT:` greps), then pane read.
 
 ## Helper script
 
@@ -184,6 +184,7 @@ bash "$SKILL_DIR/launch.sh" \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
   # omit --agent => fleet.defaults (usual nine); optional --agent name=model ...
   # optional --fleet-file PATH  => custom name=model list
+  # optional --skip-model-preflight
   # optional --keep / --no-close  => do not auto-close after synthesis
 
 # bg_run this (never foreground-poll):
@@ -195,6 +196,8 @@ bash "$SKILL_DIR/close.sh" --outdir /tmp/herdr-multi-my-review
 
 `launch.sh` namespaces live herdr agent names as `<label>-<short>` (recorded as `herdr_name`
 in `agents.json`) to avoid collisions with leftover agents. Short names stay stable for result files.
+
+Harvest validation uses `$SKILL_DIR/verdict_lib.py` (strict trailer; ignores prompt echoes).
 
 Default models live in `$SKILL_DIR/fleet.defaults` (edit, or override with `--agent` /
 `--fleet-file`). They are **examples** — every model id must already work in the caller's pi config.

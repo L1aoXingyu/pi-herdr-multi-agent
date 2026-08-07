@@ -1,6 +1,13 @@
 # Default multi-model fleet for herdr-multi-agent.
-# Override per-run with launch.sh --agent name=model ... or --fleet-file PATH.
-# Every model id must already exist in the caller's pi config / auth.
+#
+# WARNING: These model ids are author-specific. Third parties almost certainly
+# need to override via:
+#   --agent name=provider/model[:thinking]   (repeatable)
+#   --fleet-file PATH
+# or by editing this file.
+#
+# launch.sh runs `pi --list-models` preflight (unless --skip-model-preflight)
+# and fails fast if entries are missing from your pi config.
 #
 # Format: shortname=provider/model[:thinking]
 # Lines starting with # are ignored.
