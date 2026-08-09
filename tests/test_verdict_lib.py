@@ -40,6 +40,15 @@ CONFIDENCE: high
         self.assertIn("ship-with-fixes", t["verdict"])
         self.assertEqual(t["confidence"], "high")
 
+    def test_rejects_placeholder_verdict(self):
+        blob = """
+VERDICT: ...
+RISKS: ...
+REQUIRED_FIXES: ...
+CONFIDENCE: high
+"""
+        self.assertIsNone(vl.extract_trailer(blob))
+
     def test_prefers_last_valid_over_template(self):
         blob = """
 VERDICT: ship | ship-with-fixes | hold
@@ -83,6 +92,110 @@ CONFIDENCE: high
             out = Path(td)
             (out / "policy.json").write_text(json.dumps({"verdict_marker": "FINDING:"}))
             self.assertEqual(vl.load_marker(out), "FINDING:")
+
+    def test_classifies_latest_rate_limit_failure_and_redacts_url(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            agent_dir = out / "limited"
+            agent_dir.mkdir()
+            session = agent_dir / "session.jsonl"
+            session.write_text(
+                json.dumps(
+                    {
+                        "type": "message",
+                        "message": {
+                            "role": "assistant",
+                            "content": [],
+                            "stopReason": "error",
+                            "errorMessage": (
+                                "429: Weekly usage limit reached for wrk_SECRET; "
+                                "enable at https://example.invalid/private"
+                            ),
+                        },
+                    }
+                )
+                + "\n"
+            )
+            failure = vl.agent_terminal_failure(out, "limited")
+            self.assertIsNotNone(failure)
+            assert failure is not None
+            self.assertEqual(failure["category"], "rate_limit")
+            self.assertNotIn("wrk_SECRET", failure["message"])
+            self.assertNotIn("example.invalid", failure["message"])
+
+    def test_later_success_supersedes_transient_error(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            agent_dir = out / "recovered"
+            agent_dir.mkdir()
+            session = agent_dir / "session.jsonl"
+            events = [
+                {
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [],
+                        "stopReason": "error",
+                        "errorMessage": "WebSocket error",
+                    },
+                },
+                {
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": "Recovered"}],
+                        "stopReason": "stop",
+                    },
+                },
+            ]
+            session.write_text("".join(json.dumps(event) + "\n" for event in events))
+            (out / "results").mkdir()
+            (out / "results" / "recovered.pane.txt").write_text("Error: 429 stale pane output\n")
+            self.assertIsNone(vl.agent_terminal_failure(out, "recovered"))
+
+    def test_latest_error_supersedes_older_verdict(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            agent_dir = out / "failed-later"
+            agent_dir.mkdir()
+            session = agent_dir / "session.jsonl"
+            events = [
+                {
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [{
+                            "type": "text",
+                            "text": "VERDICT: ship\nRISKS: none\nREQUIRED_FIXES: N/A\nCONFIDENCE: high",
+                        }],
+                        "stopReason": "stop",
+                    },
+                },
+                {
+                    "type": "message",
+                    "message": {
+                        "role": "assistant",
+                        "content": [],
+                        "stopReason": "error",
+                        "errorMessage": "429: Weekly usage limit reached",
+                    },
+                },
+            ]
+            session.write_text("".join(json.dumps(event) + "\n" for event in events))
+            outcome = vl.agent_outcome(out, "failed-later")
+            self.assertEqual(outcome["status"], "terminal_failure")
+            self.assertEqual(outcome["category"], "rate_limit")
+
+    def test_blocked_runtime_status_overrides_verdict(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td)
+            agent_dir = out / "blocked"
+            agent_dir.mkdir()
+            (agent_dir / "verdict.md").write_text(
+                "VERDICT: ship\nRISKS: none\nREQUIRED_FIXES: N/A\nCONFIDENCE: high\n"
+            )
+            outcome = vl.agent_outcome(out, "blocked", runtime_status="blocked")
+            self.assertEqual(outcome["status"], "blocked")
 
 
 if __name__ == "__main__":

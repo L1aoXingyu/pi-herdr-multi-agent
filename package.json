@@ -28,7 +28,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "bash tests/smoke.sh && python3 tests/test_verdict_lib.py"
+    "test": "bash tests/smoke.sh && bash tests/test_watchdog.sh"
   },
   "repository": {
     "type": "git",

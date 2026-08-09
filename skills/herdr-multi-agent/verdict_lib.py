@@ -23,15 +23,30 @@ TEMPLATE_HINTS = (
     "end with:",
     "required trailer shape",
 )
+FATAL_ERROR_PATTERNS = (
+    ("rate_limit", re.compile(r"(?:\b429\b|usage limit|rate limit|quota|too many requests)", re.I)),
+    ("auth", re.compile(r"(?:\b401\b|\b403\b|unauthori[sz]ed|forbidden|invalid api key|authentication)", re.I)),
+    ("model_config", re.compile(r"(?:model (?:not found|does not exist|unavailable)|unknown model|invalid model)", re.I)),
+)
+PANE_FATAL_RE = re.compile(
+    r"(?:Error:\s*(?:429|401|403|404)\b|GoUsageLimitError|usage limit reached|"
+    r"rate limit exceeded|insufficient[_ ]quota|invalid api key|model not found)",
+    re.I,
+)
 
 
 def _is_templatey(chunk: str) -> bool:
     low = chunk.lower()
     if any(h in low for h in TEMPLATE_HINTS):
         return True
-    # bare option list in the verdict value
-    first = chunk.splitlines()[0] if chunk else ""
+    # Bare option lists and placeholder values are prompt echoes, not verdicts.
+    first = chunk.splitlines()[0].strip() if chunk else ""
+    first_value = first.split(":", 1)[-1].strip().lower()
     if "|" in first and "ship" in first.lower() and "hold" in first.lower():
+        return True
+    if first_value in {"", "...", "…", "tbd", "n/a", "na", "none", "placeholder"}:
+        return True
+    if not re.search(r"[\w\u4e00-\u9fff]", first_value):
         return True
     return False
 
@@ -157,6 +172,96 @@ def latest_session(dirpath: Path) -> Path | None:
     return sess[0] if sess else None
 
 
+def _redact_error(message: str) -> str:
+    """Keep summaries useful without copying account/workspace URLs into artifacts."""
+    message = re.sub(r"https?://\S+", "<url>", message)
+    message = re.sub(r"\bwrk_[A-Za-z0-9]+\b", "<workspace>", message)
+    return " ".join(message.split())[:500]
+
+
+def _classify_error(message: str) -> str:
+    for category, pattern in FATAL_ERROR_PATTERNS:
+        if pattern.search(message):
+            return category
+    return "provider_error"
+
+
+def _session_terminal_error(session_path: Path) -> tuple[bool, str | None]:
+    """Return whether a model turn exists and whether its latest turn ended in error."""
+    saw_model_turn = False
+    last_error: str | None = None
+    try:
+        lines = session_path.open(errors="ignore")
+    except OSError:
+        return False, None
+
+    with lines:
+        for line in lines:
+            try:
+                event = json.loads(line)
+            except Exception:
+                continue
+            if not isinstance(event, dict):
+                continue
+
+            # Pi's common session shape is {type: "message", message: {role, ...}}.
+            message = event.get("message")
+            candidate = message if isinstance(message, dict) else event
+            role = candidate.get("role")
+            role = role.lower() if isinstance(role, str) else ""
+            if role in ("assistant", "model", "ai"):
+                saw_model_turn = True
+                error_message = candidate.get("errorMessage")
+                if isinstance(error_message, str) and error_message.strip():
+                    last_error = error_message.strip()
+                else:
+                    # A later settled assistant turn supersedes an earlier transient error.
+                    last_error = None
+                continue
+
+            # Support explicit top-level error events without scanning user prompt text.
+            if event.get("type") == "error":
+                event_message = event.get("errorMessage") or event.get("message")
+                if isinstance(event_message, str) and event_message.strip():
+                    last_error = event_message.strip()
+
+    return saw_model_turn, last_error
+
+
+def agent_terminal_failure(outdir: Path, short: str) -> dict | None:
+    """Return an explicit settled-turn/provider failure, if one was recorded."""
+    session = latest_session(outdir / short)
+    if session:
+        saw_model_turn, message = _session_terminal_error(session)
+        if message:
+            return {
+                "category": _classify_error(message),
+                "message": _redact_error(message),
+                "source": "session",
+            }
+        if saw_model_turn:
+            return None
+
+    # Fallback only when no structured model turn is available. Require a strong signature so
+    # prompt text containing words such as "error" or "quota" is not misclassified.
+    pane = outdir / "results" / f"{short}.pane.txt"
+    if pane.exists():
+        blob = pane.read_text(errors="ignore")
+        match = PANE_FATAL_RE.search(blob)
+        if match:
+            line_start = blob.rfind("\n", 0, match.start()) + 1
+            line_end = blob.find("\n", match.end())
+            if line_end < 0:
+                line_end = min(len(blob), match.end() + 400)
+            message = blob[line_start:line_end]
+            return {
+                "category": _classify_error(message),
+                "message": _redact_error(message),
+                "source": "pane",
+            }
+    return None
+
+
 def collect_agent_blob(outdir: Path, short: str, prefer_assistant: bool = True) -> str:
     parts: list[str] = []
     # Prefer verdict.md (explicit recovery path)
@@ -193,6 +298,32 @@ def agent_has_valid_verdict(
     return (trailer is not None, trailer)
 
 
+def agent_outcome(
+    outdir: Path,
+    short: str,
+    marker: str = DEFAULT_MARKER,
+    start_status: str | None = None,
+    runtime_status: str | None = None,
+) -> dict:
+    """Resolve outcome precedence once for reporting and strict fleet checks."""
+    if start_status == "failed":
+        return {"status": "start_failed"}
+    if runtime_status == "blocked":
+        return {"status": "blocked"}
+    if runtime_status not in (None, "idle", "done", "missing"):
+        return {"status": "not_terminal", "agent_status": runtime_status}
+    # A latest-turn error supersedes verdict text left by an older successful turn.
+    failure = agent_terminal_failure(outdir, short)
+    if failure:
+        return {"status": "terminal_failure", **failure}
+    ok, trailer = agent_has_valid_verdict(outdir, short, marker=marker)
+    if ok:
+        return {"status": "ok", "trailer": trailer}
+    if runtime_status == "missing":
+        return {"status": "agent_missing"}
+    return {"status": "missing_verdict"}
+
+
 def load_marker(outdir: Path, fallback: str = DEFAULT_MARKER) -> str:
     pf = outdir / "policy.json"
     if pf.exists():
@@ -210,6 +341,7 @@ def main(argv: list[str]) -> int:
       verdict_lib.py extract <file> [marker]
       verdict_lib.py check-outdir <outdir> [marker]
       verdict_lib.py has <outdir> <short> [marker]
+      verdict_lib.py failure <outdir> <short>
     """
     if len(argv) < 2:
         print("usage: extract|check-outdir|has ...", file=sys.stderr)
@@ -234,10 +366,26 @@ def main(argv: list[str]) -> int:
         if t:
             print(json.dumps(t))
         return 0 if ok else 1
+    if cmd == "failure":
+        outdir = Path(argv[2])
+        short = argv[3]
+        failure = agent_terminal_failure(outdir, short)
+        if not failure:
+            print("NO_TERMINAL_FAILURE")
+            return 1
+        print(json.dumps(failure, indent=2))
+        return 0
     if cmd == "check-outdir":
         outdir = Path(argv[2])
         marker = argv[3] if len(argv) > 3 else load_marker(outdir)
         agents = json.loads((outdir / "agents.json").read_text())
+        runtime_statuses = {}
+        runtime_file = outdir / "results" / "runtime-status.json"
+        if runtime_file.exists():
+            try:
+                runtime_statuses = json.loads(runtime_file.read_text())
+            except Exception:
+                runtime_statuses = {}
         missing = []
         started = 0
         ok_n = 0
@@ -245,17 +393,26 @@ def main(argv: list[str]) -> int:
         for r in agents:
             short = r["name"]
             st = r.get("start_status", "started")
-            if st == "failed":
-                details.append({"name": short, "status": "start_failed"})
+            outcome = agent_outcome(
+                outdir,
+                short,
+                marker=marker,
+                start_status=st,
+                runtime_status=runtime_statuses.get(short),
+            )
+            status = outcome["status"]
+            if status == "start_failed":
+                details.append({"name": short, "status": status})
                 continue
             started += 1
-            ok, t = agent_has_valid_verdict(outdir, short, marker=marker, start_status=st)
-            if ok:
+            if status == "ok":
                 ok_n += 1
-                details.append({"name": short, "status": "ok", "verdict": (t or {}).get("verdict")})
+                details.append(
+                    {"name": short, "status": status, "verdict": (outcome.get("trailer") or {}).get("verdict")}
+                )
             else:
                 missing.append(short)
-                details.append({"name": short, "status": "missing_verdict"})
+                details.append({"name": short, **{k: v for k, v in outcome.items() if k != "trailer"}})
         result = {
             "started": started,
             "ok": ok_n,

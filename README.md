@@ -33,7 +33,7 @@ pi install /absolute/path/to/pi-herdr-multi-agent
 |------|------|
 | `skills/herdr-multi-agent/SKILL.md` | Agent SOP (launch → wait → harvest → synthesize → close) |
 | `launch.sh` | Create tab, split panes, serial `agent start`, prompt fanout |
-| `watchdog.sh` | Name-based poll + `VERDICT:` harvest (never closes tabs) |
+| `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
 | `fleet.defaults` | Author default model list (`name=provider/model[:thinking]`) |
 | `fleet.example` | Copy-paste template for your own fleet |
@@ -98,6 +98,7 @@ There is no credential bundling in this package.
 - Prompt **without** `herdr --wait` on fleet fanout (avoids `agent_prompt_stalled`); completion is the watchdog
 - Watchdog keys off **agent name**, harvests `agent read --source recent-unwrapped` first
 - Terminal statuses: `idle` / `done` / `blocked` / `missing` — **not** `unknown`
+- Once every agent is terminal, watchdog exits immediately: success with all verdicts, partial otherwise; provider errors such as `429` are classified from Pi sessions
 - Watchdog **never** closes tabs; `close.sh` runs only after main-agent synthesis (or `--force`)
 - Live agent names: `^[a-z][a-z0-9_-]{0,31}$`, namespaced as `<label>-<short>`
 
@@ -122,10 +123,13 @@ Keep both. Do not replace this skill with the official one for multi-model revie
   tab_id.txt
   skill_dir.txt
   results/
-    summary.txt        # harvested VERDICT blocks
+    summary.txt         # harvested VERDICT blocks / terminal failures
+    check.json           # structured strict-verdict result
+    runtime-status.json  # latest Herdr status by short agent name
     <short>.pane.txt
     <short>.extract.txt
-  cleanup.json         # written by close.sh
+  watchdog_exit.json    # ok/partial + watchdog exit code
+  cleanup.json          # written by close.sh
 ```
 
 ## Safety
@@ -142,13 +146,20 @@ Keep both. Do not replace this skill with the official one for multi-model revie
 | `model preflight failed` | `pi --list-models`, then fix `--agent` / `--fleet-file` (or auth) |
 | `prompt-file must contain 'VERDICT:'` | Add the harvest trailer to `prompt.txt` (see skill SOP) |
 | `agent_pane_busy` | Normal; launch retries. If stuck, check pane is a bare shell |
-| Watchdog `NO_VALID_VERDICT` | Agent never emitted trailer, or only echoed the prompt template — steer once / write `verdict.md` |
+| Watchdog exits partial | Inspect `TERMINAL_FAILURE` / `NO_VALID_VERDICT`; replace a failed model or steer once, then rerun watchdog |
 | `close.sh` refuses | Partial run; inspect `results/summary.txt`, then `--force` if you still want to close |
 | Orphan tab after crashed launch | `tab_id` in outdir / `launch_exit.json`; `close.sh --outdir ... --force` |
 
 See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ## Changelog
+
+### Unreleased
+
+- Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
+- Classify terminal provider/model errors (including `429` quota exhaustion) from structured Pi session records
+- Treat list-query failures as `unknown`, and keep `blocked` agents partial even if they emitted a verdict
+- Persist structured status/exit artifacts; reject placeholder `VERDICT: ...` echoes
 
 ### 0.1.1
 

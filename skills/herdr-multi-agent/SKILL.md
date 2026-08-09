@@ -330,17 +330,22 @@ Launch via `bg_run` (do not foreground-poll in the main turn). Watchdog must:
 
 1. Poll `herdr agent list` every ~20s by **`herdr_name`**.
 2. Terminal-ish statuses: `idle` | `done` | `blocked` | `missing` (after start failure skip).
-   Keep waiting until **all** names are terminal-ish **and** each successful agent has `VERDICT:`
-   in harvest text (or deadline).
+   As soon as **all** names are terminal-ish, harvest and exit: zero when every successful agent
+   has `VERDICT:`, non-zero partial otherwise. Never keep a settled fleet alive merely because a
+   trailer is missing—`bg_run` must exit to notify the main agent. Structured provider/model errors
+   (for example `429` quota exhaustion) are reported as `TERMINAL_FAILURE`.
 3. On each harvest pass, prefer:
    ```bash
    herdr agent read "$herdr_name" --source recent-unwrapped --lines 250
    ```
    then session extract `$OUTDIR/<short>/*.jsonl`, then `herdr pane read "$pane_id"` fallback.
 4. Write `$OUTDIR/results/<short>.pane.txt` (agent/pane snapshot), optional `.extract.txt`,
-   and `$OUTDIR/results/summary.txt` with each agent's trailing verdict block.
-5. On `blocked`: still snapshot; note in summary; do not invent a verdict.
-6. Deadline default 40m; honor user override.
+   `$OUTDIR/results/summary.txt`, `$OUTDIR/results/check.json`, `$OUTDIR/results/runtime-status.json`,
+   and `$OUTDIR/watchdog_exit.json`.
+5. On `blocked`, missing verdict, or explicit provider failure: snapshot, emit a partial summary,
+   exit non-zero promptly, and do not invent a verdict. A non-zero `bg_run` completion still wakes
+   the main agent to report/retry the partial fleet.
+6. Deadline default 40m applies only while at least one agent remains non-terminal; honor user override.
 
 Notify intent for the main agent (include outdir + auto-close reminder):
 
@@ -401,8 +406,8 @@ Write `$OUTDIR/cleanup.json` after attempting close:
 | `agent_prompt_stalled` | lifecycle change not seen in 5s — `agent read`, re-prompt once, send enter; do not use bare `--wait` for fleet submit |
 | prompt accepted but stays idle | re-prompt; send enter; confirm model string is valid; `agent get` for status |
 | `blocked` | `agent get` + `agent read`; answer approval UI via `agent send-keys` / prompt only if user policy allows; else leave tab and report |
-| `unknown` status | do not harvest as complete; wait or inspect pane; extend deadline |
-| watchdog all idle/done, no VERDICT | alternate-screen or format refuse — steer once "emit VERDICT block now" or "write `$OUTDIR/<short>/verdict.md`"; extend deadline if still working |
+| `unknown` status / `agent list` query failure | do not harvest as complete; retry until stall/deadline, then inspect Herdr health |
+| watchdog exits partial after all idle/done | inspect `TERMINAL_FAILURE` / `NO_VALID_VERDICT`; replace quota/provider failures, or steer once "emit VERDICT block now" / write `$OUTDIR/<short>/verdict.md`; then rerun watchdog |
 | name collision / invalid name | rename with shorter prefix; must match `^[a-z][a-z0-9_-]{0,31}$` |
 | wrong cwd | always pass `--cwd` to tab create and pane split |
 | harvest empty despite done | try `agent read --source recent-unwrapped`; then session jsonl extract; then file-fallback steer |
@@ -422,6 +427,7 @@ Write `$OUTDIR/cleanup.json` after attempting close:
 - Implementing review findings before user asks
 - Using herdr multi-TUI when the user only needs headless text (use subagents instead)
 - Treating `unknown` as success
+- Keeping the watchdog alive after every agent is terminal just because a verdict is missing (suppresses the bg completion notification)
 - Fleet-wide `agent prompt --wait` as the only completion mechanism
 - Relying on UI-focused pane instead of recorded pane_id / herdr_name
 - `herdr server stop` or killing the Herdr main process from this workflow

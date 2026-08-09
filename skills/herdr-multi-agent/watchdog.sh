@@ -11,8 +11,10 @@ Usage: watchdog.sh --outdir PATH [--deadline-sec N] [--poll-sec N] [--verdict-ma
                    [--stall-sec N]
 
 Polls herdr agent list by herdr_name from outdir/agents.json until all are
-idle|done|blocked|missing (start_failed skipped) AND each successful agent has a
-*strict* VERDICT trailer (see verdict_lib.py), or deadline/stall.
+idle|done|blocked|missing (start_failed skipped). It exits immediately once all
+agents are terminal: success when every successful agent has a *strict* VERDICT
+trailer, otherwise partial failure so bg_run can notify the parent promptly.
+Explicit provider/model failures are classified from Pi session records.
 
 Harvest order per agent:
   1) herdr agent read --source recent-unwrapped
@@ -71,13 +73,17 @@ fi
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"; }
 
 agent_status() {
-  local herdr_name=$1
-  herdr agent list 2>/dev/null | python3 -c 'import json,sys
+  local herdr_name=$1 payload
+  if ! payload=$(herdr agent list 2>/dev/null); then
+    echo unknown
+    return 0
+  fi
+  python3 -c 'import json,sys
 d=json.loads(sys.stdin.read()); name=sys.argv[1]
 for a in d["result"]["agents"]:
   if a.get("name")==name:
-    print(a.get("agent_status","missing")); raise SystemExit
-print("missing")' "$herdr_name" 2>/dev/null || echo missing
+    print(a.get("agent_status","unknown")); raise SystemExit
+print("missing")' "$herdr_name" <<<"$payload" 2>/dev/null || echo unknown
 }
 
 extract_session_assistant() {
@@ -95,9 +101,15 @@ sys.exit(0 if texts else 1)
 ' "$SKILL_DIR" "$OUTDIR" "$short" "$out"
 }
 
-has_valid_verdict() {
-  local short=$1
-  python3 "$VERDICT_PY" has "$OUTDIR" "$short" "$MARKER" >/dev/null 2>&1
+has_successful_outcome() {
+  local short=$1 runtime_status=$2
+  python3 -c 'import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import verdict_lib as vl
+outcome = vl.agent_outcome(Path(sys.argv[2]), sys.argv[3], marker=sys.argv[4], runtime_status=sys.argv[5])
+raise SystemExit(0 if outcome["status"] == "ok" else 1)
+' "$SKILL_DIR" "$OUTDIR" "$short" "$MARKER" "$runtime_status" >/dev/null 2>&1
 }
 
 harvest_agent_text() {
@@ -132,13 +144,16 @@ write_progress() {
   local line=$1 ready=$2
   python3 -c 'import json,sys,time
 from pathlib import Path
+statuses = dict(token.split("=", 1) for token in sys.argv[2].split())
 Path(sys.argv[1]).write_text(json.dumps({
   "ts": time.time(),
   "status_line": sys.argv[2],
   "ready": sys.argv[3]=="1",
   "elapsed_sec": int(sys.argv[4]),
-}, indent=2)+"\n")' \
-    "$OUTDIR/results/progress.json" "$line" "$ready" "$((SECONDS - START))"
+}, indent=2)+"\n")
+Path(sys.argv[5]).write_text(json.dumps(statuses, indent=2)+"\n")' \
+    "$OUTDIR/results/progress.json" "$line" "$ready" "$((SECONDS - START))" \
+    "$OUTDIR/results/runtime-status.json"
 }
 
 # Load rows without mapfile (bash 3.2 portable)
@@ -181,16 +196,22 @@ LAST_SIG=""
 
 while true; do
   all_terminal=1
+  blocked_count=0
   status_line=""
+  STATUSES=()
   for row in "${ROWS[@]}"; do
     IFS='|' read -r short herdr_name pane start_status <<<"$row"
     if [[ "$start_status" == "failed" ]]; then
+      STATUSES+=("start_failed")
       status_line+="$short=start_failed "
       continue
     fi
     st=$(agent_status "$herdr_name")
+    STATUSES+=("$st")
     status_line+="$short=$st "
-    if [[ "$st" != "idle" && "$st" != "done" && "$st" != "blocked" && "$st" != "missing" ]]; then
+    if [[ "$st" == "blocked" ]]; then
+      blocked_count=$((blocked_count + 1))
+    elif [[ "$st" != "idle" && "$st" != "done" && "$st" != "missing" ]]; then
       all_terminal=0
     fi
   done
@@ -201,25 +222,34 @@ while true; do
   ready_now=0
   if [[ "$all_terminal" -eq 1 ]]; then
     ready=1
+    missing_count=0
+    status_idx=0
     for row in "${ROWS[@]}"; do
       IFS='|' read -r short herdr_name pane start_status <<<"$row"
+      runtime_status=${STATUSES[$status_idx]}
+      status_idx=$((status_idx + 1))
       if [[ "$start_status" == "failed" ]]; then
         continue
       fi
       harvest_agent_text "$herdr_name" "$pane" "$OUTDIR/results/${short}.pane.txt" || true
       extract_session_assistant "$short" "$OUTDIR/results/${short}.extract.txt" 2>/dev/null || true
-      if ! has_valid_verdict "$short"; then
+      if ! has_successful_outcome "$short" "$runtime_status"; then
         ready=0
+        missing_count=$((missing_count + 1))
       fi
     done
-    if [[ "$ready" -eq 1 ]]; then
+    if [[ "$ready" -eq 1 && "$blocked_count" -eq 0 ]]; then
       log "ALL_AGENTS_FINISHED_WITH_VERDICT"
       ready_now=1
       write_progress "$status_line" 1
       break
     fi
-    sig="${status_line}|missing_verdict"
-    log "terminal but missing valid $MARKER trailer; continuing wait"
+    # idle/done/blocked/missing are settled Herdr states. Waiting cannot create a
+    # missing trailer and used to suppress bg_run completion notifications for up
+    # to the full deadline. Exit partial now so the parent can retry/steer.
+    log "ALL_AGENTS_TERMINAL_PARTIAL missing_verdict=$missing_count blocked=$blocked_count"
+    write_progress "$status_line" 0
+    break
   fi
   write_progress "$status_line" "$ready_now"
 
@@ -244,7 +274,9 @@ for row in "${ROWS[@]}"; do
   st="start_failed"
   if [[ "$start_status" != "failed" ]]; then
     st=$(agent_status "$herdr_name")
-    harvest_agent_text "$herdr_name" "$pane" "$OUTDIR/results/${short}.pane.txt" || true
+    if [[ "$all_terminal" -ne 1 ]]; then
+      harvest_agent_text "$herdr_name" "$pane" "$OUTDIR/results/${short}.pane.txt" || true
+    fi
   fi
   extract_session_assistant "$short" "$OUTDIR/results/${short}.extract.txt" 2>/dev/null || :
   {
@@ -260,9 +292,13 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import verdict_lib as vl
 outdir, short, marker, st = Path(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5]
-ok, t = vl.agent_has_valid_verdict(outdir, short, marker=marker)
-if ok and t:
-    print(t.get("raw") or json.dumps(t, indent=2))
+outcome = vl.agent_outcome(outdir, short, marker=marker, runtime_status=st)
+if outcome["status"] == "ok":
+    trailer = outcome.get("trailer") or {}
+    print(trailer.get("raw") or json.dumps(trailer, indent=2))
+elif outcome["status"] == "terminal_failure":
+    failure = {k: v for k, v in outcome.items() if k != "status"}
+    print("TERMINAL_FAILURE: " + json.dumps(failure, ensure_ascii=False))
 else:
     print("NO_VALID_VERDICT")
     blob = vl.collect_agent_blob(outdir, short)
@@ -275,11 +311,19 @@ done
 log "watchdog done"
 cat "$OUTDIR/results/summary.txt"
 
-# Strict exit via verdict_lib
+# Strict exit via verdict_lib. Preserve the structured result for the callback
+# consumer even when the watchdog exits non-zero for a partial fleet.
 set +e
-python3 "$VERDICT_PY" check-outdir "$OUTDIR" "$MARKER"
-rc=$?
+python3 "$VERDICT_PY" check-outdir "$OUTDIR" "$MARKER" | tee "$OUTDIR/results/check.json"
+rc=${PIPESTATUS[0]}
 set -e
+python3 -c 'import json,sys,time
+from pathlib import Path
+Path(sys.argv[1]).write_text(json.dumps({
+  "ts": time.time(),
+  "status": "ok" if sys.argv[2] == "0" else "partial",
+  "exit_rc": int(sys.argv[2]),
+}, indent=2) + "\n")' "$OUTDIR/watchdog_exit.json" "$rc"
 if [[ $rc -ne 0 ]]; then
   log "WATCHDOG_PARTIAL_OR_MISSING"
   exit 1
