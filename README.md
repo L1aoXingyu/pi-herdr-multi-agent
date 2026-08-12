@@ -183,6 +183,11 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased
 
+- Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
+- Cursor default seat: `fable5=cursor:claude-fable-5-thinking-high` with `--trust --force` (Run Everything)
+- Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
+- Dual fleet profiles: **usual six** `fleet.defaults` (daily) + **usual ten** `fleet.full` (heavy)
+- Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
 - Classify terminal provider/model errors (including `429` quota exhaustion) from structured Pi session records
 - Treat list-query failures as `unknown`, and keep `blocked` agents partial even if they emitted a verdict
