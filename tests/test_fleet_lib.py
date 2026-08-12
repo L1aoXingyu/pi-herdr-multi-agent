@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""Unit tests for fleet_lib (no herdr required)."""
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "skills" / "herdr-multi-agent"))
+import fleet_lib as fl  # noqa: E402
+
+
+class ParseKindModelTests(unittest.TestCase):
+    def test_pi_provider_model_thinking(self):
+        self.assertEqual(
+            fl.parse_kind_model("openai-codex/gpt-5.6-sol:xhigh"),
+            ("pi", "openai-codex/gpt-5.6-sol:xhigh"),
+        )
+        self.assertEqual(
+            fl.parse_kind_model("opencode-go/kimi-k3:max"),
+            ("pi", "opencode-go/kimi-k3:max"),
+        )
+        self.assertEqual(
+            fl.parse_kind_model("siliconflow/deepseek-ai/DeepSeek-V4-Pro:high"),
+            ("pi", "siliconflow/deepseek-ai/DeepSeek-V4-Pro:high"),
+        )
+
+    def test_explicit_cursor_kind(self):
+        self.assertEqual(
+            fl.parse_kind_model("cursor:claude-fable-5-thinking-high"),
+            ("cursor", "claude-fable-5-thinking-high"),
+        )
+
+    def test_empty_model_after_kind_errors(self):
+        with self.assertRaises(fl.FleetError):
+            fl.parse_kind_model("cursor:")
+        with self.assertRaises(fl.FleetError):
+            fl.parse_kind_model("cursor:   ")
+
+    def test_unknown_bare_prefix_not_kind(self):
+        # not a herdr kind → whole string is the model under default kind
+        self.assertEqual(
+            fl.parse_kind_model("notakind:foo-bar"),
+            ("pi", "notakind:foo-bar"),
+        )
+
+    def test_global_non_pi_kind_cannot_rebrand_provider_model(self):
+        self.assertEqual(
+            fl.parse_kind_model("openai-codex/gpt-5.6-sol:xhigh", default="cursor"),
+            ("pi", "openai-codex/gpt-5.6-sol:xhigh"),
+        )
+
+    def test_uppercase_kind_not_matched_as_kind(self):
+        # kinds are lowercase set membership; uppercase stays full model
+        kind, model = fl.parse_kind_model("CURSOR:claude-fable-5-high")
+        self.assertEqual(kind, "pi")
+        self.assertEqual(model, "CURSOR:claude-fable-5-high")
+
+    def test_parse_agent_spec(self):
+        short, kind, model = fl.parse_agent_spec(
+            "fable5=cursor:claude-fable-5-thinking-high"
+        )
+        self.assertEqual(short, "fable5")
+        self.assertEqual(kind, "cursor")
+        self.assertEqual(model, "claude-fable-5-thinking-high")
+
+
+class MatchModelTests(unittest.TestCase):
+    PI_HAY = """
+Available models:
+openai-codex/gpt-5.6-sol
+opencode-go/kimi-k3
+siliconflow/deepseek-ai/DeepSeek-V4-Pro
+deepseek/deepseek-v4-flash
+"""
+
+    CURSOR_HAY = """
+Available models
+
+claude-fable-5-thinking-high - Fable 5 1M Thinking (NO ZDR)
+claude-fable-5-high - Fable 5 1M (NO ZDR)
+claude-fable-5-thinking-xhigh - Fable 5 1M Extra High Thinking (NO ZDR)
+gpt-5.5-high - GPT-5.5 1M High
+"""
+
+    def test_pi_matches_with_thinking_suffix(self):
+        self.assertTrue(
+            fl.match_model(self.PI_HAY, "openai-codex/gpt-5.6-sol:xhigh", "pi")
+        )
+        self.assertTrue(fl.match_model(self.PI_HAY, "opencode-go/kimi-k3:max", "pi"))
+
+    def test_pi_rejects_unknown(self):
+        self.assertFalse(fl.match_model(self.PI_HAY, "openai-codex/nope:xhigh", "pi"))
+
+    def test_cursor_exact_id_only(self):
+        self.assertTrue(
+            fl.match_model(self.CURSOR_HAY, "claude-fable-5-thinking-high", "cursor")
+        )
+        self.assertTrue(fl.match_model(self.CURSOR_HAY, "claude-fable-5-high", "cursor"))
+        # substring / prefix must not match a different id
+        self.assertFalse(
+            fl.match_model(self.CURSOR_HAY, "claude-fable-5-thinking", "cursor")
+        )
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "claude-fable-5", "cursor"))
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "fable-5-high", "cursor"))
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "typo-fable-5-high", "cursor"))
+
+
+class StartArgsTests(unittest.TestCase):
+    def test_pi_args(self):
+        self.assertEqual(
+            fl.start_native_args(
+                "pi",
+                "openai-codex/gpt-5.6-sol:xhigh",
+                session_dir="/tmp/x/gpt",
+                herdr_name="rev-gpt",
+            ),
+            [
+                "--model",
+                "openai-codex/gpt-5.6-sol:xhigh",
+                "--session-dir",
+                "/tmp/x/gpt",
+                "--name",
+                "rev-gpt",
+            ],
+        )
+
+    def test_cursor_args_include_trust_force(self):
+        self.assertEqual(
+            fl.start_native_args(
+                "cursor",
+                "claude-fable-5-thinking-high",
+                session_dir="/tmp/x/f",
+                herdr_name="rev-fable5",
+            ),
+            [
+                "--model",
+                "claude-fable-5-thinking-high",
+                "--trust",
+                "--force",
+            ],
+        )
+
+
+class ExpandNameTests(unittest.TestCase):
+    def test_namespace(self):
+        self.assertEqual(fl.expand_herdr_name("mixed-kind-rev", "fable5"), "mixed-kind-rev-fable5")
+        self.assertTrue(fl.NAME_RE.match(fl.expand_herdr_name("r", "gpt56sol")))
+
+
+if __name__ == "__main__":
+    unittest.main()

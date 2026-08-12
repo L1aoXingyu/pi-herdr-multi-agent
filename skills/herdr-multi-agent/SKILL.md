@@ -28,28 +28,47 @@ Install as a pi package: `pi install git:github.com/L1aoXingyu/pi-herdr-multi-ag
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual nine below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual six below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
-| Agent kind | `pi` (override only if user asks; discover kinds via `herdr agent`) |
+| Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual nine models (default fleet)
+### Usual six models (default / daily fleet)
 
-Source of truth: `$SKILL_DIR/fleet.defaults` (shipped example; edit locally or pass `--fleet-file`).
+Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
-When the user does **not** specify models/names (or says "the usual five" / "the usual six" / "the usual nine" / "default agents"),
-launch exactly this fleet:
+When the user does **not** specify models/names (or says "the usual six" / "default agents" /
+"daily fleet"), launch exactly this fleet:
 
-| Name | `--model` |
-|---|---|
-| `gpt56sol` | `openai-codex/gpt-5.6-sol:xhigh` |
-| `k3` | `opencode-go/kimi-k3:max` |
-| `qwen38max` | `opencode-go/qwen3.8-max:max` |
-| `mimopro` | `opencode-go/mimo-v2.5-pro:max` |
-| `hy3` | `opencode-go/hy3:max` |
-| `dsv4pro` | `siliconflow/deepseek-ai/DeepSeek-V4-Pro:high` |
-| `dsv4flash` | `deepseek/deepseek-v4-flash:max` |
-| `glm52` | `siliconflow/zai-org/GLM-5.2:max` |
-| `k27code` | `siliconflow/moonshotai/Kimi-K2.7-Code:high` |
+| Name | Kind | Model |
+|---|---|---|
+| `gpt56sol` | `pi` | `openai-codex/gpt-5.6-sol:xhigh` |
+| `qwen38max` | `pi` | `opencode-go/qwen3.8-max:max` |
+| `dsv4pro` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Pro:high` |
+| `glm52` | `pi` | `siliconflow/zai-org/GLM-5.2:max` |
+| `k27code` | `pi` | `siliconflow/moonshotai/Kimi-K2.7-Code:high` |
+| `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
+
+### Full ten models (heavy fleet)
+
+When the user says "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
+
+```bash
+--fleet-file "$SKILL_DIR/fleet.full"
+```
+
+Adds back opencode-go `k3` / `mimopro` / `hy3` and `dsv4flash` (deepseek direct) on top of the six.
+Phrase map: **usual six = defaults**; **usual ten = fleet.full** (legacy wording).
+
+Fleet line formats:
+- `name=provider/model[:thinking]` → kind `pi`
+- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable5=cursor:claude-fable-5-thinking-high`)
+
+**Cursor dependency / security:** default fleet includes a cursor agent. Requires `agent` or
+`cursor-agent` on PATH and a logged-in Cursor account. Launch uses `--trust --force`
+(= UI **Run Everything**): shell/tools auto-approve unless explicitly denied. Same blast radius
+as unsupervised pi reviewers with full tools — intentional for unattended mixed fleets.
+Missing cursor CLI when the fleet lists cursor entries fails preflight hard (unless
+`--skip-model-preflight`).
 
 Override names/models when the user specifies others. Keep **stable short agent names**
 that stay unique after namespacing (see Name rules). If a default name collides with a live agent,
@@ -182,7 +201,9 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual nine); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual six); optional --agent name=model ...
+  # optional --agent fable5=cursor:claude-fable-5-thinking-high  (mixed kind)
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => usual ten / heavy
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --keep / --no-close  => do not auto-close after synthesis
@@ -279,17 +300,29 @@ For each `short|herdr_name|pane|model`:
 # nudge shell — must be available interactive shell
 herdr pane send-keys "$pane" enter 2>/dev/null || true
 sleep 1
+# pi (default)
 herdr agent start "$herdr_name" --kind pi --pane "$pane" --timeout 180000 -- \
   --model "$model" \
   --session-dir "$OUTDIR/$short" \
   --name "$herdr_name"
+
+# cursor-cli (fleet line: name=cursor:claude-fable-5-thinking-high)
+herdr agent start "$herdr_name" --kind cursor --pane "$pane" --timeout 180000 -- \
+  --model "$model" \
+  --trust \
+  --force
 ```
 
 Notes:
 
 - `agent start` returns only after Herdr detects the expected agent and considers it ready (default
   start timeout 30s if you omit `--timeout`; this skill uses up to 180s, CLI max 300s).
-- Pass native Pi args only after `--`.
+- Pass **kind-native** args only after `--` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`).
+- Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
+  still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
+- Mixed fleets are supported: each row in `agents.json` carries its own `kind`.
+- Prompt recovery is **kind-aware**: pi never re-pastes the full prompt on idle; non-pi may send a
+  single enter-only nudge. Parsing/preflight live in `fleet_lib.py` (unit-tested).
 - On `agent_pane_busy` / non-zero exit: wait 2–5s, send `enter` again, retry up to ~12 times (~60s).
 - Do **not** proceed to prompt until start succeeds and `herdr agent list` shows that name as
   `idle` or `done` (optionally `herdr agent wait "$herdr_name" --until idle --until done --timeout 30000`).
@@ -302,6 +335,15 @@ Notes:
   "pane_id": "w5:pX",
   "tab_id": "w5:t9",
   "model": "openai-codex/gpt-5.6-sol:xhigh",
+  "kind": "pi",
+  "start_status": "started"
+},{
+  "name": "fable5",
+  "herdr_name": "my-review-fable5",
+  "pane_id": "w5:pY",
+  "tab_id": "w5:t9",
+  "model": "claude-fable-5-thinking-high",
+  "kind": "cursor",
   "start_status": "started"
 }]
 ```

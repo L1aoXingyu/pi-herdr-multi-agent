@@ -35,8 +35,10 @@ pi install /absolute/path/to/pi-herdr-multi-agent
 | `launch.sh` | Create tab, split panes, serial `agent start`, prompt fanout |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author default model list (`name=provider/model[:thinking]`) |
+| `fleet.defaults` | Author daily default — **usual six** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **usual ten** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
+| `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
 
 ## Quick start (operator / agent)
@@ -79,15 +81,40 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual nine** and will fail preflight on machines
-without those providers. For third-party use:
+Shipped `fleet.defaults` is the **author's usual six** (daily lean profile):
+
+- anchors: Codex `gpt-5.6-sol:xhigh` + Cursor `claude-fable-5-thinking-high`
+- one opencode-go seat (`qwen38max`) — scarce quota
+- all SiliconFlow seats kept (unlimited token account on the author's side)
+
+Heavy / max-diversity **usual ten** lives in `fleet.full`:
+
+```bash
+bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
+```
+
+Both profiles **fail preflight** on machines without the required providers/CLIs
+(missing `pi` or `agent`/`cursor-agent` when listed is a hard error, not a silent skip).
+For third-party use:
 
 1. Copy `skills/herdr-multi-agent/fleet.example` → your own file and edit, or
-2. Pass `--fleet-file PATH`, or
-3. Pass one or more `--agent name=provider/model[:thinking]`
+2. Pass `--fleet-file PATH` (including shipped `fleet.full`), or
+3. Pass one or more `--agent name=provider/model[:thinking]` or `--agent name=kind:model`
 
-Discover models with `pi --list-models`. `launch.sh` preflights fleet entries against that
-list (override with `--skip-model-preflight` only if you know what you're doing).
+Discover models with `pi --list-models` and (for Cursor) `agent --list-models`.
+`launch.sh` preflights via shared `fleet_lib.py` (exact cursor id match; pi token match).
+Override with `--skip-model-preflight` only if you know what you're doing.
+
+Cursor rows start with `--trust --force` (UI **Run Everything**) so unattended fleets do not
+block on shell allowlist prompts. Treat that as full tool autonomy.
+
+Mixed-kind example:
+
+```bash
+bash "$SKILL_DIR/launch.sh" ... \
+  --agent gpt56sol=openai-codex/gpt-5.6-sol:xhigh \
+  --agent fable5=cursor:claude-fable-5-thinking-high
+```
 
 There is no credential bundling in this package.
 

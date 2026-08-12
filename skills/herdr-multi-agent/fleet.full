@@ -1,0 +1,18 @@
+# Heavy / max-diversity fleet — author's full ten.
+# Use when quota allows or for high-stakes reviews:
+#   bash launch.sh ... --fleet-file "$SKILL_DIR/fleet.full"
+#
+# Daily default is fleet.defaults (usual six). Same line format.
+# Add-back order from six → ten when opencode-go quota improves:
+#   mimopro → hy3 → k3  (+ dsv4flash for non-SF DeepSeek path)
+
+gpt56sol=openai-codex/gpt-5.6-sol:xhigh
+k3=opencode-go/kimi-k3:max
+qwen38max=opencode-go/qwen3.8-max:max
+mimopro=opencode-go/mimo-v2.5-pro:max
+hy3=opencode-go/hy3:max
+dsv4pro=siliconflow/deepseek-ai/DeepSeek-V4-Pro:high
+dsv4flash=deepseek/deepseek-v4-flash:max
+glm52=siliconflow/zai-org/GLM-5.2:max
+k27code=siliconflow/moonshotai/Kimi-K2.7-Code:high
+fable5=cursor:claude-fable-5-thinking-high

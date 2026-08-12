@@ -14,21 +14,31 @@ abspath() {
 usage() {
   cat <<'EOF'
 Usage: launch.sh --label NAME --cwd PATH --outdir PATH --prompt-file PATH \
-  [--agent name=provider/model[:thinking] ...]
+  [--agent name=provider/model[:thinking]|name=kind:model ...]
   [--fleet-file PATH]
   [--workspace ID] [--session-prefix STR] [--start-timeout-ms N] [--ready-retries N]
   [--skip-model-preflight] [--kind KIND]
   [--keep|--no-close] [--force]
 
-Creates a Herdr tab, splits panes, starts Pi serially with shell-ready retries,
+Creates a Herdr tab, splits panes, starts agents serially with shell-ready retries,
 prompts every agent, writes mapping + policy under outdir.
 
 If no --agent is given, loads name=model lines from --fleet-file (default:
-$SKILL_DIR/fleet.defaults). Models must already exist in the caller's pi config.
+$SKILL_DIR/fleet.defaults).
+
+Spec formats:
+  name=provider/model[:thinking]   # default kind=pi (or global --kind)
+  name=kind:model                  # per-agent kind when KIND is a herdr agent kind
+                                   # e.g. fable5=cursor:claude-fable-5-thinking-high
+
+Pi models must exist in the caller's pi config; cursor models are checked via
+`agent --list-models` / `cursor-agent --list-models` when available.
+Cursor agents start with --trust --force (UI: Run Everything) for unattended fleets.
+Missing pi/cursor CLIs required by the fleet fail preflight hard (unless skipped).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
 --keep / --no-close => policy.auto_close=false.
 --force allows reusing a non-empty outdir (also clears prior results/verdicts).
-Requires: bash, python3, herdr on PATH, pi on PATH (for model preflight unless skipped).
+Requires: bash, python3, herdr on PATH; pi/agent on PATH for kind-specific preflight.
 EOF
 }
 
@@ -104,7 +114,7 @@ load_fleet_file() {
     line=$(printf '%s' "$line" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
     [[ -z "$line" ]] && continue
     if [[ "$line" != *=* ]]; then
-      echo "invalid fleet line (need name=model): $line" >&2
+      echo "invalid fleet line (need name=model or name=kind:model): $line" >&2
       exit 2
     fi
     AGENTS+=("$line")
@@ -189,59 +199,33 @@ print(ws[0]["workspace_id"])
 }
 
 validate_and_expand_agents() {
-  python3 - <<'PY' "$SESSION_PREFIX" "${AGENTS[@]}"
-import json, re, subprocess, sys
-prefix = sys.argv[1]
-specs = sys.argv[2:]
-name_re = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+  python3 - <<'PY' "$SKILL_DIR" "$SESSION_PREFIX" "$AGENT_KIND" "${AGENTS[@]}"
+import json, subprocess, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
 
-def sanitize_token(s: str, max_len: int = 32) -> str:
-    s = s.strip().lower()
-    s = re.sub(r"[^a-z0-9_-]+", "-", s)
-    s = re.sub(r"-+", "-", s).strip("-")
-    if not s:
-        s = "agent"
-    if not s[0].isalpha():
-        s = "a" + s
-    return s[:max_len]
+prefix = sys.argv[2]
+default_kind = (sys.argv[3] or "pi").strip().lower() or "pi"
+specs = sys.argv[4:]
 
-prefix = sanitize_token(prefix, 32)
 rows = []
 shorts = set()
-for spec in specs:
-    if "=" not in spec:
-        raise SystemExit(f"invalid --agent (need name=model): {spec!r}")
-    short, model = spec.split("=", 1)
-    # leave room for at least "a-" prefix (2 chars) when namespaced
-    short = sanitize_token(short, 30)
-    if not name_re.match(short):
-        raise SystemExit(f"invalid agent short name {short!r} (want ^[a-z][a-z0-9_-]{{0,31}}$)")
-    if not model.strip():
-        raise SystemExit(f"empty model for {short}")
-    if short in shorts:
-        raise SystemExit(f"duplicate short name: {short}")
-    shorts.add(short)
-
-    # herdr live name <= 32: prefer prefix-short; fall back to short alone
-    budget = 32 - 1 - len(short)  # for "prefix-short"
-    if budget >= 1:
-        p = sanitize_token(prefix, budget)
-        if not p:
-            p = "r"
-        # re-trim budget after sanitize
-        p = p[:budget].rstrip("-") or "r"
-        herdr_name = f"{p}-{short}"
-    else:
-        herdr_name = short[:32]
-    herdr_name = herdr_name[:32]
-    if not name_re.match(herdr_name):
-        raise SystemExit(
-            f"invalid herdr name derived: {herdr_name!r} "
-            f"(need ^[a-z][a-z0-9_-]{{0,31}}$; shorten --label/--session-prefix)"
-        )
-    if len(herdr_name) > 32:
-        raise SystemExit(f"herdr_name still too long: {herdr_name!r} len={len(herdr_name)}")
-    rows.append({"name": short, "herdr_name": herdr_name, "model": model.strip()})
+try:
+    for spec in specs:
+        short, kind, model = fl.parse_agent_spec(spec, default_kind)
+        if short in shorts:
+            raise fl.FleetError(f"duplicate short name: {short}")
+        shorts.add(short)
+        herdr_name = fl.expand_herdr_name(prefix, short)
+        rows.append({
+            "name": short,
+            "herdr_name": herdr_name,
+            "model": model,
+            "kind": kind,
+        })
+except fl.FleetError as e:
+    raise SystemExit(str(e))
 
 seen_h = set()
 for r in rows:
@@ -263,94 +247,102 @@ PY
 }
 
 model_preflight() {
-  # Best-effort: ensure each provider/model appears in `pi --list-models`.
-  # Model strings may include :thinking suffix.
+  # Kind-aware preflight via fleet_lib:
+  #   pi/cursor missing CLI or list-models failure → hard fail (exit 3)
+  #   unknown kinds → WARN skip
   if [[ "$SKIP_MODEL_PREFLIGHT" -eq 1 ]]; then
     log "model preflight skipped"
     return 0
   fi
-  if ! command -v pi >/dev/null; then
-    log "WARN: pi not on PATH; skip model preflight"
-    return 0
-  fi
-  local list
-  set +e
-  list=$(pi --list-models 2>/dev/null)
-  local rc=$?
-  set -e
-  if [[ $rc -ne 0 || -z "$list" ]]; then
-    log "WARN: pi --list-models failed; skip model preflight"
-    return 0
-  fi
-  python3 - <<'PY' "$list" "${AGENTS[@]}"
+  python3 - <<'PY' "$SKILL_DIR" "$AGENT_KIND" "${AGENTS[@]}"
 import sys
-raw = sys.argv[1]
-specs = sys.argv[2:]
-# Build searchable haystack lowercased
-hay = raw.lower()
-missing = []
-for spec in specs:
-    if "=" not in spec:
-        continue
-    short, model = spec.split("=", 1)
-    model = model.strip()
-    base = model.split(":", 1)[0]  # drop thinking
-    # accept provider/id or bare id match against list lines
-    parts = base.split("/", 1)
-    candidates = [base.lower()]
-    if len(parts) == 2:
-        candidates.append(parts[1].lower())
-        candidates.append(parts[0].lower() + " " + parts[1].lower())
-    ok = any(c and c in hay for c in candidates)
-    if not ok:
-        missing.append(f"{short}={model}")
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+
+default_kind = (sys.argv[2] or "pi").strip().lower() or "pi"
+specs = sys.argv[3:]
+try:
+    missing, skipped = fl.preflight_specs(specs, default_kind, hard_fail_missing_cli=True)
+except fl.FleetError as e:
+    sys.stderr.write(str(e) + "\n")
+    sys.exit(3)
 if missing:
     sys.stderr.write(
-        "model preflight failed — not found via `pi --list-models`:\n  - "
+        "model preflight failed — not found in kind-specific model list:\n  - "
         + "\n  - ".join(missing)
-        + "\nFix auth/models.json, pass different --agent/--fleet-file, or --skip-model-preflight\n"
+        + "\nFix auth/CLI login, pass different --agent/--fleet-file, or --skip-model-preflight\n"
     )
     sys.exit(3)
-print("model_preflight_ok", len(specs))
+for k in skipped:
+    if k not in ("pi", "cursor"):
+        print(f"WARN: no model preflight for kind={k}; continuing", file=sys.stderr)
+n = sum(1 for s in specs if "=" in s)
+print("model_preflight_ok", n, "skipped_kinds=", ",".join(skipped) or "-")
+PY
+}
+
+start_agent_args() {
+  # Print NUL-separated native args for herdr agent start -- <args...>
+  # Source of truth: fleet_lib.start_native_args
+  local kind=$1 model=$2 short=$3 herdr_name=$4
+  python3 - <<'PY' "$SKILL_DIR" "$kind" "$model" "$OUTDIR/$short" "$herdr_name"
+import sys
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+args = fl.start_native_args(
+    sys.argv[2],
+    sys.argv[3],
+    session_dir=sys.argv[4],
+    herdr_name=sys.argv[5],
+)
+sys.stdout.buffer.write(b"\0".join(a.encode() for a in args) + (b"\0" if args else b""))
 PY
 }
 
 start_agent() {
-  local herdr_name=$1 pane=$2 model=$3 short=$4
+  local herdr_name=$1 pane=$2 model=$3 short=$4 kind=$5
   local i resp rc busy_retries=0 hard_fail_retries=0
+  local -a native_args=()
   # busy shell: up to READY_RETRIES; other errors (bad model etc.): max 2 tries
   for ((i=1; i<=READY_RETRIES; i++)); do
     herdr pane send-keys "$pane" enter 2>/dev/null || true
     sleep 1
+    native_args=()
+    while IFS= read -r -d '' tok; do
+      native_args+=("$tok")
+    done < <(start_agent_args "$kind" "$model" "$short" "$herdr_name")
     set +e
-    resp=$(herdr agent start "$herdr_name" --kind "$AGENT_KIND" --pane "$pane" --timeout "$START_TIMEOUT_MS" -- \
-      --model "$model" \
-      --session-dir "$OUTDIR/$short" \
-      --name "$herdr_name" 2>&1)
+    resp=$(herdr agent start "$herdr_name" --kind "$kind" --pane "$pane" --timeout "$START_TIMEOUT_MS" -- \
+      "${native_args[@]}" 2>&1)
     rc=$?
     set -e
     if [[ $rc -eq 0 ]] && ! grep -q '"error"' <<<"$resp"; then
       set +e
       herdr agent wait "$herdr_name" --until idle --until done --timeout 30000 >/dev/null 2>&1
       set -e
+      # Non-pi TUIs (cursor-agent etc.) need a beat after interactive_ready before
+      # composer accepts herdr agent prompt; otherwise text lands half-submitted.
+      if [[ "$kind" != "pi" ]]; then
+        sleep 3
+      fi
       printf '%s\n' "$resp"
       return 0
     fi
     # Classify: pane busy → keep retrying; else fail fast after 2
     if grep -Eqi 'agent_pane_busy|not an available shell|pane_busy' <<<"$resp"; then
       busy_retries=$((busy_retries + 1))
-      log "start busy-retry $busy_retries/$READY_RETRIES herdr_name=$herdr_name pane=$pane"
+      log "start busy-retry $busy_retries/$READY_RETRIES herdr_name=$herdr_name kind=$kind pane=$pane"
       sleep 2
       continue
     fi
     hard_fail_retries=$((hard_fail_retries + 1))
-    log "start hard-fail try $hard_fail_retries/2 herdr_name=$herdr_name rc=$rc resp=$(echo "$resp" | tr '\n' ' ' | head -c 300)"
+    log "start hard-fail try $hard_fail_retries/2 herdr_name=$herdr_name kind=$kind rc=$rc resp=$(echo "$resp" | tr '\n' ' ' | head -c 300)"
     if (( hard_fail_retries >= 2 )); then
       break
     fi
     sleep 2
   done
-  log "FAILED start herdr_name=$herdr_name pane=$pane"
+  log "FAILED start herdr_name=$herdr_name kind=$kind pane=$pane"
   herdr agent read "$herdr_name" --source recent-unwrapped --lines 40 2>/dev/null \
     || herdr pane read "$pane" --source recent-unwrapped --lines 40 2>/dev/null \
     || herdr pane read "$pane" --lines 40 2>/dev/null \
@@ -386,9 +378,14 @@ build_panes() {
 }
 
 prompt_agent() {
+  # $1 herdr_name  $2 prompt_file  $3 kind (default pi)
   local herdr_name=$1
   local prompt_file=$2
+  local kind=${3:-pi}
   local resp rc st i
+  local saw_active=0
+  local idle_ticks=0
+  local nudged=0
 
   _submit() {
     # Use prompt file via stdin-ish: pass content; herdr CLI takes string arg.
@@ -419,21 +416,24 @@ PY
 
   if ! _submit; then
     if grep -q 'agent_prompt_stalled' <<<"$resp"; then
-      log "agent_prompt_stalled herdr_name=$herdr_name; read + retry once"
+      log "agent_prompt_stalled herdr_name=$herdr_name kind=$kind; read + retry once"
       herdr agent read "$herdr_name" --source recent-unwrapped --lines 40 >/dev/null 2>&1 || true
     else
-      log "prompt submit failed herdr_name=$herdr_name; retry once"
+      log "prompt submit failed herdr_name=$herdr_name kind=$kind; retry once"
     fi
     herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
     sleep 1
     if ! _submit; then
-      log "prompt submit failed herdr_name=$herdr_name resp=$(echo "$resp" | tr '\n' ' ' | head -c 300)"
+      log "prompt submit failed herdr_name=$herdr_name kind=$kind resp=$(echo "$resp" | tr '\n' ' ' | head -c 300)"
       herdr agent read "$herdr_name" --source recent-unwrapped --lines 60 2>/dev/null | tail -n 40 || true
       return 1
     fi
   fi
 
-  for ((i=1; i<=15; i++)); do
+  # Prefer observing working/done/blocked.
+  # pi: accept idle quickly — never re-paste prompt (avoids double-submit on status lag).
+  # non-pi (cursor): cold composer may need enter-only nudge; still never re-paste full prompt.
+  for ((i=1; i<=20; i++)); do
     st=$(herdr agent list 2>/dev/null | python3 -c 'import json,sys
 d=json.loads(sys.stdin.read()); name=sys.argv[1]
 for a in d["result"]["agents"]:
@@ -441,15 +441,43 @@ for a in d["result"]["agents"]:
     print(a.get("agent_status","missing")); raise SystemExit
 print("missing")' "$herdr_name" 2>/dev/null || echo missing)
     case "$st" in
-      working|done|idle|blocked) return 0 ;;
-      unknown) ;;
-      missing)
-        # not registered — fail
+      working)
+        saw_active=1
+        return 0
         ;;
+      done|blocked)
+        return 0
+        ;;
+      idle)
+        if [[ "$saw_active" -eq 1 ]]; then
+          return 0
+        fi
+        idle_ticks=$((idle_ticks + 1))
+        if [[ "$kind" == "pi" ]]; then
+          # Fast pi turns can settle idle before we sample working; accept soon.
+          if [[ "$idle_ticks" -ge 2 ]]; then
+            log "prompt accepted as idle (pi) herdr_name=$herdr_name"
+            return 0
+          fi
+        else
+          # Non-pi: one enter-only nudge after ~6s; never full re-submit.
+          if [[ "$idle_ticks" -eq 3 && "$nudged" -eq 0 ]]; then
+            nudged=1
+            log "prompt still idle for $herdr_name kind=$kind; enter-only nudge once"
+            herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
+          fi
+          if [[ "$idle_ticks" -ge 8 ]]; then
+            log "prompt accepted as idle (no working observed) herdr_name=$herdr_name kind=$kind"
+            return 0
+          fi
+        fi
+        ;;
+      unknown) ;;
+      missing) ;;
     esac
     sleep 2
   done
-  log "prompt submitted but status still $st for $herdr_name (NOT treating as success)"
+  log "prompt submitted but status still $st for $herdr_name kind=$kind (NOT treating as success)"
   return 1
 }
 
@@ -473,13 +501,16 @@ printf '%s\n' "$TAB_ID" >"$OUTDIR/tab_id.txt"
 python3 - <<PY
 import json
 from pathlib import Path
+rows=json.loads(Path("$OUTDIR/agents.planned.json").read_text())
+kinds=sorted({r.get("kind","pi") for r in rows})
 Path("$OUTDIR/policy.json").write_text(json.dumps({
     "auto_close": bool(int("$AUTO_CLOSE")),
     "verdict_marker": "VERDICT:",
     "label": "$LABEL",
     "session_prefix": "$SESSION_PREFIX",
     "tab_id": "$TAB_ID",
-    "agent_kind": "$AGENT_KIND",
+    "agent_kind_default": "$AGENT_KIND",
+    "agent_kinds": kinds,
     "close_after": "main_agent_synthesis",
     "keep_on_partial_or_blocked": True,
 }, indent=2) + "\n")
@@ -520,7 +551,7 @@ while IFS= read -r line || [[ -n "$line" ]]; do
 done < <(python3 -c 'import json,sys
 rows=json.load(open(sys.argv[1]))
 for r in rows:
-    print("|".join([r["name"], r["herdr_name"], r["model"], r["pane_id"]]))
+    print("|".join([r["name"], r["herdr_name"], r["model"], r["pane_id"], r.get("kind") or "pi"]))
 ' "$OUTDIR/agents.json")
 if [[ ${#ROWS[@]} -eq 0 ]]; then
   log "FATAL: no agent rows parsed from agents.json"
@@ -528,16 +559,16 @@ if [[ ${#ROWS[@]} -eq 0 ]]; then
 fi
 : >"$OUTDIR/start_status.tsv"
 for row in "${ROWS[@]}"; do
-  IFS='|' read -r short herdr_name model pane <<<"$row"
+  IFS='|' read -r short herdr_name model pane kind <<<"$row"
   mkdir -p "$OUTDIR/$short"
-  log "starting short=$short herdr_name=$herdr_name pane=$pane model=$model"
-  if start_agent "$herdr_name" "$pane" "$model" "$short" >/dev/null; then
+  log "starting short=$short herdr_name=$herdr_name pane=$pane kind=$kind model=$model"
+  if start_agent "$herdr_name" "$pane" "$model" "$short" "$kind" >/dev/null; then
     status=started
-    log "started $herdr_name"
+    log "started $herdr_name kind=$kind"
   else
     status=failed
     FAIL=1
-    log "start failed $herdr_name"
+    log "start failed $herdr_name kind=$kind"
   fi
   printf '%s\t%s\n' "$short" "$status" >>"$OUTDIR/start_status.tsv"
 done
@@ -571,15 +602,15 @@ PY
 # --- prompt started agents ---
 PROMPT_FILE_ABS=$(abspath "$PROMPT_FILE")
 for row in "${ROWS[@]}"; do
-  IFS='|' read -r short herdr_name model pane <<<"$row"
+  IFS='|' read -r short herdr_name model pane kind <<<"$row"
   st=$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]));
 print(next(r["start_status"] for r in rows if r["name"]==sys.argv[2]))' "$OUTDIR/agents.json" "$short")
   if [[ "$st" != "started" ]]; then
     log "skip prompt $herdr_name (start_status=$st)"
     continue
   fi
-  log "prompting $herdr_name"
-  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS"; then
+  log "prompting $herdr_name kind=$kind"
+  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS" "$kind"; then
     log "prompted $herdr_name (accepted)"
     python3 -c 'import json,sys; p=sys.argv[1]; n=sys.argv[2]; rows=json.load(open(p));
 [(r.update({"prompt_status":"working"}) if r["herdr_name"]==n else None) for r in rows];
