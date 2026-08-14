@@ -42,7 +42,7 @@ When the user does **not** specify models/names (or says "the usual six" / "defa
 | Name | Kind | Model |
 |---|---|---|
 | `gpt56sol` | `pi` | `openai-codex/gpt-5.6-sol:xhigh` |
-| `qwen38max` | `pi` | `opencode-go/qwen3.8-max:max` |
+| `glm53` | `pi` | `opencode-go/glm-5.3:max` |
 | `dsv4pro` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Pro:high` |
 | `glm52` | `pi` | `siliconflow/zai-org/GLM-5.2:max` |
 | `k27code` | `pi` | `siliconflow/moonshotai/Kimi-K2.7-Code:high` |
@@ -57,6 +57,7 @@ When the user says "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full"
 ```
 
 Adds back opencode-go `k3` / `mimopro` / `hy3` and `dsv4flash` (deepseek direct) on top of the six.
+Daily Go seat is `glm53` (replaced `qwen38max`); SiliconFlow `glm52` stays as the free GLM vote.
 Phrase map: **usual six = defaults**; **usual ten = fleet.full** (legacy wording).
 
 Fleet line formats:

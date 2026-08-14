@@ -84,7 +84,7 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 Shipped `fleet.defaults` is the **author's usual six** (daily lean profile):
 
 - anchors: Codex `gpt-5.6-sol:xhigh` + Cursor `claude-fable-5-thinking-high`
-- one opencode-go seat (`qwen38max`) — scarce quota
+- one opencode-go seat (`glm53`) — scarce quota; replaced `qwen38max`
 - all SiliconFlow seats kept (unlimited token account on the author's side)
 
 Heavy / max-diversity **usual ten** lives in `fleet.full`:
@@ -187,6 +187,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 - Cursor default seat: `fable5=cursor:claude-fable-5-thinking-high` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
 - Dual fleet profiles: **usual six** `fleet.defaults` (daily) + **usual ten** `fleet.full` (heavy)
+- Daily Go seat is `glm53=opencode-go/glm-5.3:max` (replaced `qwen38max`); SiliconFlow `glm52` stays
 - Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
 - Classify terminal provider/model errors (including `429` quota exhaustion) from structured Pi session records

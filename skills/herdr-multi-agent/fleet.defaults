@@ -19,14 +19,15 @@
 #   shortname=kind:model                  # herdr kind prefix (cursor/codex/...)
 # Lines starting with # are ignored.
 #
-# Rationale (2026-08-12 dual-review gpt56sol + fable5):
+# Rationale (2026-08-12 dual-review gpt56sol + fable5;
+#            2026-08-14 Go seat: glm53 replaces qwen38max):
 #   - Keep anchors: sol-xhigh + cursor fable thinking-high
-#   - One opencode-go seat only (qwen38max) — scarce quota
-#   - Keep all SiliconFlow seats (unlimited token account)
-#   - Drop k3/mimopro/hy3/dsv4flash from daily → fleet.full
+#   - One opencode-go seat only (glm53) — scarce quota; quality > qwen3.8-max
+#   - Keep all SiliconFlow seats (unlimited token account), including glm52
+#   - Drop k3/mimopro/hy3/dsv4flash from daily → fleet.full; qwen38max is out
 
 gpt56sol=openai-codex/gpt-5.6-sol:xhigh
-qwen38max=opencode-go/qwen3.8-max:max
+glm53=opencode-go/glm-5.3:max
 dsv4pro=siliconflow/deepseek-ai/DeepSeek-V4-Pro:high
 glm52=siliconflow/zai-org/GLM-5.2:max
 k27code=siliconflow/moonshotai/Kimi-K2.7-Code:high

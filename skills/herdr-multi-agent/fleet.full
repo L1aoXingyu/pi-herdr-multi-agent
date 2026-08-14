@@ -5,10 +5,12 @@
 # Daily default is fleet.defaults (usual six). Same line format.
 # Add-back order from six → ten when opencode-go quota improves:
 #   mimopro → hy3 → k3  (+ dsv4flash for non-SF DeepSeek path)
+# Daily Go seat is glm53 (replaced qwen38max). Keep glm52 as the free SF vote.
+# qwen38max is out unless explicitly --agent'd.
 
 gpt56sol=openai-codex/gpt-5.6-sol:xhigh
 k3=opencode-go/kimi-k3:max
-qwen38max=opencode-go/qwen3.8-max:max
+glm53=opencode-go/glm-5.3:max
 mimopro=opencode-go/mimo-v2.5-pro:max
 hy3=opencode-go/hy3:max
 dsv4pro=siliconflow/deepseek-ai/DeepSeek-V4-Pro:high
