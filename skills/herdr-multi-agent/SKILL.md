@@ -28,16 +28,16 @@ Install as a pi package: `pi install git:github.com/L1aoXingyu/pi-herdr-multi-ag
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual six below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual seven below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual six models (default / daily fleet)
+### Usual seven models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
-When the user does **not** specify models/names (or says "the usual six" / "default agents" /
-"daily fleet"), launch exactly this fleet:
+When the user does **not** specify models/names (or says "the usual seven" / "the usual six" /
+"default agents" / "daily fleet"), launch exactly this fleet:
 
 | Name | Kind | Model |
 |---|---|---|
@@ -47,24 +47,26 @@ When the user does **not** specify models/names (or says "the usual six" / "defa
 | `glm52` | `pi` | `siliconflow/zai-org/GLM-5.2:max` |
 | `k27code` | `pi` | `siliconflow/moonshotai/Kimi-K2.7-Code:high` |
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
+| `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 
 ### Full ten models (heavy fleet)
 
-When the user says "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
+When the user says "the usual ten" / "the usual eleven" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
 ```bash
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `k3` / `mimopro` / `hy3` and `dsv4flash` (deepseek direct) on top of the six.
+Adds back opencode-go `mimopro` / `hy3` and `dsv4flash` (deepseek direct) on top of the seven.
 Daily Go seat is `glm53` (replaced `qwen38max`); SiliconFlow `glm52` stays as the free GLM vote.
-Phrase map: **usual six = defaults**; **usual ten = fleet.full** (legacy wording).
+Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.
+Phrase map: **usual seven = defaults** (legacy: usual six); **usual ten = fleet.full** (legacy: usual eleven).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable5=cursor:claude-fable-5-thinking-high`)
 
-**Cursor dependency / security:** default fleet includes a cursor agent. Requires `agent` or
+**Cursor dependency / security:** default fleet includes two cursor agents (`fable5`, `k3max`). Requires `agent` or
 `cursor-agent` on PATH and a logged-in Cursor account. Launch uses `--trust --force`
 (= UI **Run Everything**): shell/tools auto-approve unless explicitly denied. Same blast radius
 as unsupervised pi reviewers with full tools — intentional for unattended mixed fleets.
@@ -202,8 +204,9 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual six); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual seven); optional --agent name=model ...
   # optional --agent fable5=cursor:claude-fable-5-thinking-high  (mixed kind)
+  # optional --agent k3max=cursor:kimi-k3-max
   # optional --fleet-file "$SKILL_DIR/fleet.full"  => usual ten / heavy
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight

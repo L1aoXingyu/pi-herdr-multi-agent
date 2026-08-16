@@ -64,6 +64,8 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual(short, "fable5")
         self.assertEqual(kind, "cursor")
         self.assertEqual(model, "claude-fable-5-thinking-high")
+        short, kind, model = fl.parse_agent_spec("k3max=cursor:kimi-k3-max")
+        self.assertEqual((short, kind, model), ("k3max", "cursor", "kimi-k3-max"))
 
 
 class MatchModelTests(unittest.TestCase):
@@ -81,6 +83,8 @@ Available models
 claude-fable-5-thinking-high - Fable 5 1M Thinking (NO ZDR)
 claude-fable-5-high - Fable 5 1M (NO ZDR)
 claude-fable-5-thinking-xhigh - Fable 5 1M Extra High Thinking (NO ZDR)
+kimi-k3-max - Kimi K3
+kimi-k3-high - Kimi K3 High
 gpt-5.5-high - GPT-5.5 1M High
 """
 
@@ -98,6 +102,8 @@ gpt-5.5-high - GPT-5.5 1M High
             fl.match_model(self.CURSOR_HAY, "claude-fable-5-thinking-high", "cursor")
         )
         self.assertTrue(fl.match_model(self.CURSOR_HAY, "claude-fable-5-high", "cursor"))
+        self.assertTrue(fl.match_model(self.CURSOR_HAY, "kimi-k3-max", "cursor"))
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "kimi-k3", "cursor"))
         # substring / prefix must not match a different id
         self.assertFalse(
             fl.match_model(self.CURSOR_HAY, "claude-fable-5-thinking", "cursor")
