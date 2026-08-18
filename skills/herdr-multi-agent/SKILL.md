@@ -1,22 +1,37 @@
 ---
 name: herdr-multi-agent
-description: Launch multiple interactive Pi TUI agents in a Herdr tab for parallel independent review/investigation, wait with a bg-task watchdog, and harvest structured verdicts. Use when the user wants multi-model TUI review via herdr, "launch N agents in herdr", "multi-agent review with visible panes", or prefers herdr TUI over headless subagents.
+description: Launch a multi-model Herdr review fleet from Grok Build, wait with a background watchdog, and harvest VERDICT trailers. Use when the user wants multi-model TUI review via herdr, "launch N agents in herdr", "multi-agent review with visible panes", or prefers herdr TUI over headless spawn_subagent.
 ---
 
-# /herdr-multi-agent — Multi-model Pi TUI via Herdr
+# /herdr-multi-agent — Multi-model Herdr fleet from Grok Build
 
-Use this when the user wants **visible interactive Pi panes** in Herdr for independent parallel work
-(review, investigation, design critique). Prefer this over headless `pi-subagents` when TUI visibility
-matters. Prefer headless subagents when only the final text result is needed.
+Grok-owned copy (not a symlink to the pi skill). Parent is **Grok Build**. Fleet panes are still
+whatever `herdr agent --kind` starts (default fleet: Pi + Cursor).
 
-This skill is an **out-of-band fleet launcher** (main Pi orchestrates via `herdr` CLI). It is **not**
-the official in-pane `herdr` skill (`HERDR_ENV=1` operator). For single-pane Herdr control from inside
-a pane, use the official skill; for multi-model review fleets, use this one.
+Use this when the user wants **visible interactive panes** in Herdr for independent parallel work
+(review, investigation, design critique). Prefer this over headless `spawn_subagent` when TUI
+visibility matters. Prefer `spawn_subagent` when only the final text result is needed, or Herdr
+is unavailable.
 
-Aligned with **herdr ≥ 0.7.5** CLI semantics (see `herdr agent` / official `skills/herdr/SKILL.md`).
+This skill is an **out-of-band fleet launcher** (Grok orchestrates via `herdr` CLI). It is **not**
+the official in-pane `herdr` skill (`HERDR_ENV=1` operator). Official `herdr` must not replace this
+skill for fleets — that skill stops outside Herdr and defaults to splitting the current tab.
+
+Aligned with **herdr ≥ 0.7.5** CLI semantics (see `herdr agent` / official `herdr` skill).
 Tested against herdr 0.8.x. Requires a running Herdr server and `herdr` on `PATH`.
 
-Install as a pi package: `pi install git:github.com/L1aoXingyu/pi-herdr-multi-agent`
+Lives at `~/.grok/skills/herdr-multi-agent`. Do not re-symlink to `~/.pi/agent/skills/`.
+
+## Parent harness (Grok Build)
+
+Grok has **no** pi `bg_run` / `bg-task`. Do not look for those tools.
+
+| Need | Do this |
+|---|---|
+| Start the fleet | `run_terminal_command` → `bash "$SKILL_DIR/launch.sh" ...` |
+| Wait for the fleet | `run_terminal_command` with `background: true` → `bash "$SKILL_DIR/watchdog.sh" --outdir ...`. Never foreground-poll. Completion wakes this turn; then `get_command_or_subagent_output` if you need the log. |
+| Headless single helper | `spawn_subagent` — not this skill |
+| In-pane Herdr ops | official `herdr` skill, and only if `HERDR_ENV=1` |
 
 
 ## Defaults
@@ -66,8 +81,9 @@ Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable5=cursor:claude-fable-5-thinking-high`)
 
-**Cursor dependency / security:** default fleet includes two cursor agents (`fable5`, `k3max`). Requires `agent` or
-`cursor-agent` on PATH and a logged-in Cursor account. Launch uses `--trust --force`
+**Cursor dependency / security:** default fleet includes two cursor agents (`fable5`, `k3max`). Requires
+`cursor-agent` on PATH (bare `agent` only if it is cursor-cli — Grok's `agent` is rejected) and a
+logged-in Cursor account. Launch uses `--trust --force`
 (= UI **Run Everything**): shell/tools auto-approve unless explicitly denied. Same blast radius
 as unsupervised pi reviewers with full tools — intentional for unattended mixed fleets.
 Missing cursor CLI when the fleet lists cursor entries fails preflight hard (unless
@@ -154,7 +170,10 @@ Official:
 - **Fleet completion** uses `watchdog.sh` (name-based poll + VERDICT harvest), not N blocking
   `agent prompt --wait` calls in the main turn.
 - **Single-agent recovery** may use `herdr agent wait <name> --until idle --until done --until blocked --timeout ...`
-  or a one-shot re-prompt; still require `VERDICT:` in harvest text.
+  or one enter-only nudge. Full re-prompt only if the composer still looks empty
+  (cold title, no `Pasted text`, no prompt fingerprint). Title change means the
+  first paste landed — do **not** stack another full prompt. Still require `VERDICT:`
+  in harvest text.
 
 ### Layout primitives
 
@@ -193,8 +212,8 @@ Official:
 ## Helper script
 
 Prefer the bundled helpers **in this skill directory** (the folder that contains this `SKILL.md`).
-Resolve `SKILL_DIR` from the path you just read — do **not** hardcode `~/.pi/agent/skills/...`
-(package installs live under `~/.pi/agent/git/...` or a local checkout).
+Resolve `SKILL_DIR` from that path — usually `~/.grok/skills/herdr-multi-agent`. Do **not** point
+at the pi copy under `~/.pi/agent/skills/`.
 
 ```bash
 # After reading this SKILL.md, set SKILL_DIR to its parent directory.
@@ -212,7 +231,7 @@ bash "$SKILL_DIR/launch.sh" \
   # optional --skip-model-preflight
   # optional --keep / --no-close  => do not auto-close after synthesis
 
-# bg_run this (never foreground-poll):
+# background: true on run_terminal_command (never foreground-poll; no bg_run):
 bash "$SKILL_DIR/watchdog.sh" --outdir /tmp/herdr-multi-my-review
 
 # after main-agent consensus reply:
@@ -325,8 +344,12 @@ Notes:
 - Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
   still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
 - Mixed fleets are supported: each row in `agents.json` carries its own `kind`.
-- Prompt recovery is **kind-aware**: pi never re-pastes the full prompt on idle; non-pi may send a
-  single enter-only nudge. Parsing/preflight live in `fleet_lib.py` (unit-tested).
+- Prompt recovery is **kind-aware**: pi never re-pastes the full prompt on idle; non-pi sends an
+  enter-only nudge. Full re-prompt only if the composer still looks empty (default `Cursor Agent`
+  title, no `Pasted text`, no ROLE/ONLY fingerprint). Title change or a paste marker means the
+  first submit landed — do **not** stack another full prompt. After that enter, landed+idle is
+  success; watchdog owns the wait. Source of truth: `fleet_lib.prompt_already_landed` /
+  `nonpi_prompt_policy`. Harvest unwraps narrow-pane soft wraps before scoring `VERDICT:`.
 - On `agent_pane_busy` / non-zero exit: wait 2–5s, send `enter` again, retry up to ~12 times (~60s).
 - Do **not** proceed to prompt until start succeeds and `herdr agent list` shows that name as
   `idle` or `done` (optionally `herdr agent wait "$herdr_name" --until idle --until done --timeout 30000`).
@@ -365,32 +388,34 @@ done
 Within ~10s, expect `agent_status=working` (or already settled `done`/`idle` if the model was instant).
 If still stuck non-working without progress:
 
-- `herdr agent read "$herdr_name" --source recent-unwrapped --lines 80`
-- re-issue `herdr agent prompt` once
-- last resort `herdr agent send-keys "$herdr_name" enter`
-- if error is `agent_prompt_stalled`, treat as submit race: read + re-prompt once, do not panic
+- `herdr agent read` / check `terminal_title_stripped`
+- if landed (title left `Cursor Agent`, or `Pasted text #N`, or a ROLE/ONLY line): **enter only**
+- if the composer still looks empty: one full `herdr agent prompt`, then enter
+- if error is `agent_prompt_stalled`, treat as submit race: read; re-prompt only when empty, do not panic
+- never stack a third full paste because herdr status stayed `idle`
 
-### 5. bg-task watchdog (mandatory)
+### 5. Background watchdog (mandatory)
 
-Launch via `bg_run` (do not foreground-poll in the main turn). Watchdog must:
+Launch `watchdog.sh` with `run_terminal_command` and `background: true` (do not foreground-poll
+in the main turn; this harness has no `bg_run`). Watchdog must:
 
 1. Poll `herdr agent list` every ~20s by **`herdr_name`**.
 2. Terminal-ish statuses: `idle` | `done` | `blocked` | `missing` (after start failure skip).
    As soon as **all** names are terminal-ish, harvest and exit: zero when every successful agent
    has `VERDICT:`, non-zero partial otherwise. Never keep a settled fleet alive merely because a
-   trailer is missing—`bg_run` must exit to notify the main agent. Structured provider/model errors
-   (for example `429` quota exhaustion) are reported as `TERMINAL_FAILURE`.
+   trailer is missing — the background command must exit so Grok wakes on completion. Structured
+   provider/model errors (for example `429` quota exhaustion) are reported as `TERMINAL_FAILURE`.
 3. On each harvest pass, prefer:
    ```bash
    herdr agent read "$herdr_name" --source recent-unwrapped --lines 250
    ```
-   then session extract `$OUTDIR/<short>/*.jsonl`, then `herdr pane read "$pane_id"` fallback.
+   then session extract `$OUTDIR/<short>/*.jsonl` (Pi pane sessions), then `herdr pane read "$pane_id"` fallback.
 4. Write `$OUTDIR/results/<short>.pane.txt` (agent/pane snapshot), optional `.extract.txt`,
-   `$OUTDIR/results/summary.txt`, `$OUTDIR/results/check.json`, `$OUTDIR/results/runtime-status.json`,
+   `$OUTDIR/results/summary.txt`, `$OUTDIR/results/check.json`, `$OUTDIR/results/progress.json`,
    and `$OUTDIR/watchdog_exit.json`.
 5. On `blocked`, missing verdict, or explicit provider failure: snapshot, emit a partial summary,
-   exit non-zero promptly, and do not invent a verdict. A non-zero `bg_run` completion still wakes
-   the main agent to report/retry the partial fleet.
+   exit non-zero promptly, and do not invent a verdict. A non-zero background-command completion
+   still wakes Grok to report/retry the partial fleet.
 6. Deadline default 40m applies only while at least one agent remains non-terminal; honor user override.
 
 Notify intent for the main agent (include outdir + auto-close reminder):
@@ -449,8 +474,8 @@ Write `$OUTDIR/cleanup.json` after attempting close:
 |---|---|
 | `agent_pane_busy` at start | wait + enter + retry; confirm pane is bare shell via `pane read` / `agent` absent in list |
 | start hangs past timeout | check pane output; close **that** pane only if this run created it, re-split one pane, retry that agent only |
-| `agent_prompt_stalled` | lifecycle change not seen in 5s — `agent read`, re-prompt once, send enter; do not use bare `--wait` for fleet submit |
-| prompt accepted but stays idle | re-prompt; send enter; confirm model string is valid; `agent get` for status |
+| `agent_prompt_stalled` | lifecycle change not seen in 5s — `agent read`; enter if landed, re-prompt only if composer empty; do not use bare `--wait` for fleet submit |
+| prompt accepted but stays idle | check title / `Pasted text`; if landed: enter only. If empty: one re-prompt + enter. Do **not** full-paste again after launch already failed-on-idle |
 | `blocked` | `agent get` + `agent read`; answer approval UI via `agent send-keys` / prompt only if user policy allows; else leave tab and report |
 | `unknown` status / `agent list` query failure | do not harvest as complete; retry until stall/deadline, then inspect Herdr health |
 | watchdog exits partial after all idle/done | inspect `TERMINAL_FAILURE` / `NO_VALID_VERDICT`; replace quota/provider failures, or steer once "emit VERDICT block now" / write `$OUTDIR/<short>/verdict.md`; then rerun watchdog |
@@ -467,13 +492,14 @@ Write `$OUTDIR/cleanup.json` after attempting close:
 - Watchdog matching on pane id only
 - Watchdog or launch script closing the tab before main-agent synthesis
 - Skipping verdict trailer in the prompt
+- Full re-prompt of a cursor pane whose title already left `Cursor Agent` or that shows `Pasted text #N`
 - Reusing a tab that still has `working` agents
 - Leaving successful default review tabs open indefinitely (UI clutter)
 - Closing unrelated tabs/panes while cleaning up
 - Implementing review findings before user asks
-- Using herdr multi-TUI when the user only needs headless text (use subagents instead)
+- Using herdr multi-TUI when the user only needs headless text (use `spawn_subagent` instead)
 - Treating `unknown` as success
-- Keeping the watchdog alive after every agent is terminal just because a verdict is missing (suppresses the bg completion notification)
+- Keeping the watchdog alive after every agent is terminal just because a verdict is missing (suppresses the background-command completion wake)
 - Fleet-wide `agent prompt --wait` as the only completion mechanism
 - Relying on UI-focused pane instead of recorded pane_id / herdr_name
 - `herdr server stop` or killing the Herdr main process from this workflow
@@ -493,7 +519,7 @@ Write `$OUTDIR/cleanup.json` after attempting close:
 |---|---|---|
 | Role | In-pane operator (`HERDR_ENV=1`) | External fleet orchestrator |
 | Scale | Sibling helper / one command | N-model review tab |
-| Wait | `prompt --wait` / `agent wait` | bg watchdog + VERDICT contract |
+| Wait | `prompt --wait` / `agent wait` | background `watchdog.sh` + VERDICT contract |
 | Output | Free text (+ file fallback) | Forced `VERDICT:` trailer + outdir artifacts |
 | Cleanup | Don't close what you didn't create | Own review tab; auto-close after synthesis |
 

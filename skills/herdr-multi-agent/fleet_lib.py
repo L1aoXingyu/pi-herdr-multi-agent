@@ -186,9 +186,26 @@ def load_cmd_output(cmd: list[str], timeout: float = 60.0) -> tuple[str | None, 
     return p.stdout, None
 
 
+def looks_like_cursor_cli_help(text: str) -> bool:
+    """True if --help output is cursor-cli, not Grok Build or another `agent`."""
+    low = (text or "").lower()
+    if "grok build" in low:
+        return False
+    return "--list-models" in low or "cursor agent" in low
+
+
 def which_cursor_cli() -> str | None:
-    for cand in ("agent", "cursor-agent"):
-        if shutil.which(cand):
+    """Resolve cursor-cli. Prefer the unambiguous binary.
+
+    Bare ``agent`` is also Grok Build (``~/.grok/bin/agent``) on some PATHs.
+    Only accept ``agent`` when ``--help`` looks like cursor-cli.
+    """
+    for cand in ("cursor-agent", "agent"):
+        path = shutil.which(cand)
+        if not path:
+            continue
+        hay, _err = load_cmd_output([path, "--help"], timeout=15.0)
+        if hay is not None and looks_like_cursor_cli_help(hay):
             return cand
     return None
 
@@ -242,8 +259,9 @@ def preflight_specs(
             if not bin_name:
                 if hard_fail_missing_cli:
                     raise FleetError(
-                        f"agent/cursor-agent not on PATH but fleet has {len(items)} cursor agent(s); "
-                        "install cursor-cli or drop cursor entries / pass --skip-model-preflight"
+                        f"cursor-cli not found but fleet has {len(items)} cursor agent(s); "
+                        "install cursor-agent (do not use Grok's `agent`), drop cursor entries, "
+                        "or pass --skip-model-preflight"
                     )
                 skipped.append(kind)
                 continue
@@ -291,3 +309,107 @@ def expand_herdr_name(prefix: str, short: str) -> str:
             f"(need ^[a-z][a-z0-9_-]{{0,31}}$; shorten --label/--session-prefix)"
         )
     return herdr_name
+
+
+# --- non-pi prompt landing (cursor composer) ---
+#
+# herdr `idle` after `agent prompt` does NOT mean the composer is empty.
+# Cursor often ACKs, renames the session from ROLE:, and still stays idle
+# under --no-focus. A second full paste stacks duplicate briefs.
+
+COLD_TITLES = frozenset(
+    {
+        "",
+        "cursor agent",
+        "cursor-agent",
+        "cursor",
+        "cursor cli",
+        "agent",
+    }
+)
+PASTED_TEXT_RE = re.compile(r"\[\s*Pasted text #\d+", re.I)
+PASTED_TEXT_BARE_RE = re.compile(r"\bPasted text #\d+", re.I)
+PROMPT_HEAD_RE = re.compile(r"^(ROLE|ONLY|FORBIDDEN|READ-ONLY REVIEW)\b", re.I)
+NONPI_MAX_TICKS = 30
+
+
+def normalize_title(title: str | None) -> str:
+    t = re.sub(r"\s+", " ", (title or "").strip())
+    return t.lstrip("-–— ").strip()
+
+
+def title_left_cold(title: str | None) -> bool:
+    """True when the session title is no longer a cursor cold-start default."""
+    t = normalize_title(title).lower()
+    return bool(t) and t not in COLD_TITLES
+
+
+def prompt_fingerprints(prompt_text: str | None) -> list[str]:
+    """Distinctive lines that mean *this* fleet prompt landed.
+
+    Prefer ROLE/ONLY/FORBIDDEN/READ-ONLY heads. Do not use VERDICT: — that
+    string lives in the template and in the agent's reply.
+    """
+    fps: list[str] = []
+    for line in (prompt_text or "").splitlines():
+        s = line.strip()
+        if PROMPT_HEAD_RE.match(s) and len(s) >= 12:
+            fps.append(s)
+    if fps:
+        return fps
+    for line in (prompt_text or "").splitlines():
+        s = line.strip()
+        if len(s) >= 32 and not s.upper().startswith("VERDICT"):
+            return [s]
+    return []
+
+
+def prompt_already_landed(
+    *,
+    title: str | None = None,
+    pane_text: str | None = None,
+    prompt_text: str | None = None,
+) -> bool:
+    """True if a full re-prompt would likely stack a duplicate brief.
+
+    Any one signal is enough: title left the cold default, Cursor paste
+    marker, or a fingerprint line from the prompt file in the pane.
+    """
+    if title_left_cold(title):
+        return True
+    pane = pane_text or ""
+    if PASTED_TEXT_RE.search(pane) or PASTED_TEXT_BARE_RE.search(pane):
+        return True
+    if pane:
+        for fp in prompt_fingerprints(prompt_text):
+            if fp in pane:
+                return True
+    return False
+
+
+def nonpi_prompt_policy(
+    *,
+    idle_ticks: int,
+    landed: bool,
+    max_ticks: int = NONPI_MAX_TICKS,
+) -> str:
+    """Next action for a non-pi agent that is still not ``working``.
+
+    Returns one of: ``wait``, ``enter``, ``repaste``, ``skip_repaste``,
+    ``accept``, ``fail``.
+
+    Enter once (~6s) so a sitting composer can submit. Full re-paste only
+    when the composer still looks empty. Landed+idle after that enter is
+    success — watchdog owns the wait.
+    """
+    if idle_ticks < 1:
+        raise ValueError(f"idle_ticks must be >= 1, got {idle_ticks}")
+    if idle_ticks == 3:
+        return "enter"
+    if idle_ticks == 6:
+        return "skip_repaste" if landed else "repaste"
+    if landed and idle_ticks >= 4:
+        return "accept"
+    if idle_ticks >= max_ticks:
+        return "accept" if landed else "fail"
+    return "wait"

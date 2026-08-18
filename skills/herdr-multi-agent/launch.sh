@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Launch N interactive Pi agents in a Herdr tab, prompt them, write mapping files.
-# Does NOT run the watchdog (use watchdog.sh via bg_run).
+# Does NOT run the watchdog (Grok: run watchdog.sh via run_terminal_command background:true).
 set -euo pipefail
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -32,13 +32,13 @@ Spec formats:
                                    # e.g. fable5=cursor:claude-fable-5-thinking-high
 
 Pi models must exist in the caller's pi config; cursor models are checked via
-`agent --list-models` / `cursor-agent --list-models` when available.
+`cursor-agent --list-models` (bare `agent` only if it is cursor-cli, not Grok).
 Cursor agents start with --trust --force (UI: Run Everything) for unattended fleets.
 Missing pi/cursor CLIs required by the fleet fail preflight hard (unless skipped).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
 --keep / --no-close => policy.auto_close=false.
 --force allows reusing a non-empty outdir (also clears prior results/verdicts).
-Requires: bash, python3, herdr on PATH; pi/agent on PATH for kind-specific preflight.
+Requires: bash, python3, herdr on PATH; pi/cursor-agent on PATH for kind-specific preflight.
 EOF
 }
 
@@ -322,8 +322,11 @@ start_agent() {
       set -e
       # Non-pi TUIs (cursor-agent etc.) need a beat after interactive_ready before
       # composer accepts herdr agent prompt; otherwise text lands half-submitted.
+      # Enter focuses the composer / dismisses splash so the first prompt is not dropped.
       if [[ "$kind" != "pi" ]]; then
         sleep 3
+        herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
+        sleep 1
       fi
       printf '%s\n' "$resp"
       return 0
@@ -386,6 +389,7 @@ prompt_agent() {
   local saw_active=0
   local idle_ticks=0
   local nudged=0
+  local resubmitted=0
 
   _submit() {
     # Use prompt file via stdin-ish: pass content; herdr CLI takes string arg.
@@ -432,51 +436,134 @@ PY
 
   # Prefer observing working/done/blocked.
   # pi: accept idle quickly — never re-paste prompt (avoids double-submit on status lag).
-  # non-pi (cursor): cold composer may need enter-only nudge; still never re-paste full prompt.
-  for ((i=1; i<=20; i++)); do
-    st=$(herdr agent list 2>/dev/null | python3 -c 'import json,sys
+  # non-pi (cursor): idle ≠ empty composer. Title change / Pasted text / prompt
+  # fingerprint = already landed → enter-only, never stack a full re-paste.
+  # Full re-prompt only when the composer still looks empty. Policy:
+  # fleet_lib.nonpi_prompt_policy / prompt_already_landed.
+  local title=""
+  local saw_landed=0
+  local accept_now=0
+
+  _fetch_state() {
+    python3 -c 'import json,sys
 d=json.loads(sys.stdin.read()); name=sys.argv[1]
 for a in d["result"]["agents"]:
   if a.get("name")==name:
-    print(a.get("agent_status","missing")); raise SystemExit
-print("missing")' "$herdr_name" 2>/dev/null || echo missing)
+    title=a.get("terminal_title_stripped") or a.get("terminal_title") or ""
+    print(a.get("agent_status","missing") + "\t" + title.replace("\t"," ").replace("\n"," "))
+    raise SystemExit
+print("missing\t")' "$herdr_name" 2>/dev/null || echo missing$'\t'
+  }
+
+  _landed_now() {
+    python3 - <<'PY' "$SKILL_DIR" "$title" "$herdr_name" "$prompt_file" "$idle_ticks"
+import subprocess, sys
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+title, name, prompt_path, tick_s = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+prompt = open(prompt_path, encoding="utf-8", errors="replace").read()
+tick = int(tick_s)
+pane = ""
+if not fl.title_left_cold(title) and tick in (3, 6):
+    try:
+        pane = subprocess.check_output(
+            ["herdr", "agent", "read", name, "--source", "recent-unwrapped",
+             "--lines", "80", "--format", "text"],
+            text=True, timeout=15,
+        )
+    except Exception:
+        pane = ""
+print("yes" if fl.prompt_already_landed(title=title, pane_text=pane, prompt_text=prompt) else "no")
+PY
+  }
+
+  _nonpi_recover_tick() {
+    idle_ticks=$((idle_ticks + 1))
+    local landed=0
+    if [[ "$saw_landed" -eq 1 ]] || [[ "$(_landed_now)" == "yes" ]]; then
+      landed=1
+      saw_landed=1
+    fi
+    local action
+    action=$(python3 -c 'import sys
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+print(fl.nonpi_prompt_policy(idle_ticks=int(sys.argv[2]), landed=sys.argv[3]=="1"))' \
+      "$SKILL_DIR" "$idle_ticks" "$landed")
+    case "$action" in
+      enter)
+        if [[ "$nudged" -eq 0 ]]; then
+          nudged=1
+          log "prompt still $st for $herdr_name kind=$kind; enter-only nudge once"
+          herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
+        fi
+        ;;
+      repaste)
+        if [[ "$resubmitted" -eq 0 ]]; then
+          resubmitted=1
+          log "prompt still $st for $herdr_name kind=$kind; full re-prompt once (no land evidence)"
+          _submit || true
+        fi
+        ;;
+      skip_repaste)
+        log "prompt still $st for $herdr_name kind=$kind; already landed — skip full re-prompt"
+        ;;
+      accept)
+        log "prompt accepted as landed ($st) herdr_name=$herdr_name kind=$kind"
+        accept_now=1
+        ;;
+      fail)
+        ;;
+      wait) ;;
+    esac
+  }
+
+  # 30 * 2s = 60s. Landed+idle returns early via policy (accept after enter).
+  for ((i=1; i<=30; i++)); do
+    local state
+    state=$(herdr agent list 2>/dev/null | _fetch_state)
+    st=${state%%$'\t'*}
+    title=${state#*$'\t'}
+    [[ "$st" == "$state" ]] && title=""
     case "$st" in
       working)
         saw_active=1
         return 0
         ;;
       done|blocked)
-        return 0
+        if [[ "$kind" == "pi" || "$saw_active" -eq 1 ]]; then
+          return 0
+        fi
+        log "non-pi $st without working for $herdr_name; treating as unseen idle"
+        _nonpi_recover_tick
         ;;
       idle)
         if [[ "$saw_active" -eq 1 ]]; then
           return 0
         fi
-        idle_ticks=$((idle_ticks + 1))
         if [[ "$kind" == "pi" ]]; then
+          idle_ticks=$((idle_ticks + 1))
           # Fast pi turns can settle idle before we sample working; accept soon.
           if [[ "$idle_ticks" -ge 2 ]]; then
             log "prompt accepted as idle (pi) herdr_name=$herdr_name"
             return 0
           fi
         else
-          # Non-pi: one enter-only nudge after ~6s; never full re-submit.
-          if [[ "$idle_ticks" -eq 3 && "$nudged" -eq 0 ]]; then
-            nudged=1
-            log "prompt still idle for $herdr_name kind=$kind; enter-only nudge once"
-            herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
-          fi
-          if [[ "$idle_ticks" -ge 8 ]]; then
-            log "prompt accepted as idle (no working observed) herdr_name=$herdr_name kind=$kind"
-            return 0
-          fi
+          _nonpi_recover_tick
         fi
         ;;
       unknown) ;;
       missing) ;;
     esac
+    if [[ "$accept_now" -eq 1 ]]; then
+      return 0
+    fi
     sleep 2
   done
+  if [[ "$saw_landed" -eq 1 ]]; then
+    log "prompt submitted; still $st but already landed — treating as accepted herdr_name=$herdr_name kind=$kind"
+    return 0
+  fi
   log "prompt submitted but status still $st for $herdr_name kind=$kind (NOT treating as success)"
   return 1
 }
@@ -635,7 +722,7 @@ for a in d["result"]["agents"]:
 '
 
 cat >"$OUTDIR/WATCHDOG_HINT.txt" <<EOF
-# Run via bg_run (do not close tab here):
+# Grok: run_terminal_command background:true (do not close tab here):
 bash $SKILL_DIR/watchdog.sh --outdir $OUTDIR
 # Main agent closes after synthesis:
 # bash $SKILL_DIR/close.sh --outdir $OUTDIR

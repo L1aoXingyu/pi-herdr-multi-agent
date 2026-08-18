@@ -1,7 +1,7 @@
 {
   "name": "pi-herdr-multi-agent",
   "version": "0.1.1",
-  "description": "Multi-model interactive Pi TUI fleets via Herdr \u2014 launch, watchdog harvest, auto-close",
+  "description": "Grok Build branch: multi-model Herdr fleets — launch, watchdog harvest, auto-close",
   "type": "module",
   "keywords": [
     "pi-package",
@@ -28,7 +28,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "test": "python3 tests/test_fleet_lib.py && python3 tests/test_verdict_lib.py && bash tests/smoke.sh && bash tests/test_watchdog.sh"
+    "test": "python3 tests/test_fleet_lib.py && python3 tests/test_verdict_lib.py && python3 skills/herdr-multi-agent/tests/test_prompt_landed.py && bash tests/smoke.sh && bash tests/test_watchdog.sh"
   },
   "repository": {
     "type": "git",

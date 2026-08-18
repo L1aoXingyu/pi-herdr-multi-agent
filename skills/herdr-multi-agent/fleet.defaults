@@ -11,7 +11,7 @@
 #
 # launch.sh runs kind-aware model preflight (unless --skip-model-preflight):
 #   pi     -> pi --list-models
-#   cursor -> agent|cursor-agent --list-models
+#   cursor -> cursor-agent --list-models (bare `agent` only if it is cursor-cli)
 # and fails fast if entries are missing.
 #
 # Format:

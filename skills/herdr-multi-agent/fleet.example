@@ -9,7 +9,7 @@
 # Discover models:
 #   pi --list-models
 #   pi --list-models deepseek
-#   agent --list-models          # cursor-cli
+#   cursor-agent --list-models   # cursor-cli (not Grok's `agent`)
 #   herdr agent                  # supported kinds
 #
 # Shipped profiles (author-specific; only work if configured):

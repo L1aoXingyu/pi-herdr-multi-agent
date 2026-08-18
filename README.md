@@ -1,30 +1,44 @@
-# pi-herdr-multi-agent
+# pi-herdr-multi-agent (`grok` branch)
 
-Multi-model **interactive Pi TUI** fleets inside [Herdr](https://github.com/herdrdev/herdr), packaged as a [pi](https://pi.dev) skill.
+This branch is the **Grok Build** parent-harness variant of the same skill.
+`main` stays the Pi package. Do not merge this branch into `main` as a silent
+replace — parent wait tools and prompt recovery differ.
 
-Launch N visible Pi panes in one labeled tab, give them the same prompt, wait with a background watchdog, harvest machine-readable `VERDICT:` blocks, synthesize consensus in the main agent, then auto-close the review tab.
+Launch N visible agent panes in one labeled Herdr tab, give them the same prompt,
+wait with a background watchdog, harvest machine-readable `VERDICT:` blocks,
+synthesize consensus in the **Grok** parent, then auto-close the review tab.
 
-Prefer this over headless `pi-subagents` when **TUI visibility** matters. Prefer headless subagents when you only need the final text.
+Prefer this over headless `spawn_subagent` when **TUI visibility** matters.
+Prefer `spawn_subagent` when you only need the final text.
 
 ## Requirements
 
-- [pi](https://pi.dev) coding agent
+- [Grok Build](https://grok.com) CLI (parent orchestrator)
 - [Herdr](https://github.com/herdrdev/herdr) **≥ 0.7.5** (`herdr` on `PATH`, server running) — tested on 0.8.x
 - `python3` and `bash` on `PATH` (scripts avoid bash-4-only `mapfile` / GNU `readlink -f`)
-- Model providers already configured in your pi auth / `models.json`
+- Fleet pane kinds (default: Pi + Cursor) already logged in on this machine
 
-## Install
+## Install (Grok)
+
+```bash
+git clone -b grok git@github.com:L1aoXingyu/pi-herdr-multi-agent.git
+ln -sfn "$(pwd)/pi-herdr-multi-agent/skills/herdr-multi-agent" ~/.grok/skills/herdr-multi-agent
+```
+
+Or add a worktree from an existing checkout:
+
+```bash
+git worktree add -b grok ../pi-herdr-multi-agent-grok origin/grok
+ln -sfn /absolute/path/to/pi-herdr-multi-agent-grok/skills/herdr-multi-agent \
+  ~/.grok/skills/herdr-multi-agent
+```
+
+Grok discovers `SKILL.md` from `~/.grok/skills/`. Restart the session so the skill list refreshes.
+
+Pi users should stay on `main`:
 
 ```bash
 pi install git:github.com/L1aoXingyu/pi-herdr-multi-agent
-```
-
-Restart pi (or start a new session) so the skill is discovered. Invoke with `/skill:herdr-multi-agent` or by asking for a multi-model Herdr review.
-
-Local checkout:
-
-```bash
-pi install /absolute/path/to/pi-herdr-multi-agent
 ```
 
 ## What you get
@@ -72,7 +86,7 @@ bash "$SKILL_DIR/launch.sh" \
   # optional: --fleet-file ./my-fleet.txt
   # optional: --keep
 
-# background wait (do not foreground-poll in the main agent turn):
+# Grok parent: run_terminal_command background:true (never foreground-poll; no bg_run):
 bash "$SKILL_DIR/watchdog.sh" --outdir "$OUTDIR"
 
 # after reading results/summary.txt and posting consensus:
@@ -182,7 +196,15 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ## Changelog
 
-### Unreleased
+### Unreleased (`grok` branch)
+
+- Parent harness is Grok Build: `run_terminal_command` + `background: true` (no pi `bg_run`)
+- Cursor prompt recovery: `prompt_already_landed` / `nonpi_prompt_policy` — enter-only when the first paste already landed; no stacked full re-prompt
+- `which_cursor_cli` rejects Grok's `~/.grok/bin/agent`; require `cursor-agent`
+- Narrow-pane `VERDICT:` unwrap in `verdict_lib.py`; watchdog writes `progress.json` + `runtime-status.json`
+- Unit tests: `skills/herdr-multi-agent/tests/test_prompt_landed.py`
+
+### Unreleased (`main`)
 
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
 - Cursor default seats: `fable5=cursor:claude-fable-5-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)

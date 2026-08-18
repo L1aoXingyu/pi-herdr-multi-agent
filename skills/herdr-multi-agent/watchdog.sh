@@ -13,7 +13,7 @@ Usage: watchdog.sh --outdir PATH [--deadline-sec N] [--poll-sec N] [--verdict-ma
 Polls herdr agent list by herdr_name from outdir/agents.json until all are
 idle|done|blocked|missing (start_failed skipped). It exits immediately once all
 agents are terminal: success when every successful agent has a *strict* VERDICT
-trailer, otherwise partial failure so bg_run can notify the parent promptly.
+trailer, otherwise partial failure so the Grok background command can notify the parent promptly.
 Explicit provider/model failures are classified from Pi session records.
 
 Harvest order per agent:
@@ -193,6 +193,7 @@ log "watchdog start outdir=$OUTDIR deadline=${DEADLINE_SEC}s stall=${STALL_SEC}s
 START=$SECONDS
 LAST_PROGRESS=$SECONDS
 LAST_SIG=""
+TERMINAL_HARVESTED=0
 
 while true; do
   all_terminal=1
@@ -238,6 +239,7 @@ while true; do
         missing_count=$((missing_count + 1))
       fi
     done
+    TERMINAL_HARVESTED=1
     if [[ "$ready" -eq 1 && "$blocked_count" -eq 0 ]]; then
       log "ALL_AGENTS_FINISHED_WITH_VERDICT"
       ready_now=1
@@ -245,7 +247,7 @@ while true; do
       break
     fi
     # idle/done/blocked/missing are settled Herdr states. Waiting cannot create a
-    # missing trailer and used to suppress bg_run completion notifications for up
+    # missing trailer and used to suppress background-command completion wakes for up
     # to the full deadline. Exit partial now so the parent can retry/steer.
     log "ALL_AGENTS_TERMINAL_PARTIAL missing_verdict=$missing_count blocked=$blocked_count"
     write_progress "$status_line" 0
@@ -274,7 +276,7 @@ for row in "${ROWS[@]}"; do
   st="start_failed"
   if [[ "$start_status" != "failed" ]]; then
     st=$(agent_status "$herdr_name")
-    if [[ "$all_terminal" -ne 1 ]]; then
+    if [[ "$TERMINAL_HARVESTED" -ne 1 ]]; then
       harvest_agent_text "$herdr_name" "$pane" "$OUTDIR/results/${short}.pane.txt" || true
     fi
   fi
@@ -292,17 +294,17 @@ from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import verdict_lib as vl
 outdir, short, marker, st = Path(sys.argv[2]), sys.argv[3], sys.argv[4], sys.argv[5]
-outcome = vl.agent_outcome(outdir, short, marker=marker, runtime_status=st)
-if outcome["status"] == "ok":
-    trailer = outcome.get("trailer") or {}
-    print(trailer.get("raw") or json.dumps(trailer, indent=2))
-elif outcome["status"] == "terminal_failure":
-    failure = {k: v for k, v in outcome.items() if k != "status"}
-    print("TERMINAL_FAILURE: " + json.dumps(failure, ensure_ascii=False))
+ok, t = vl.agent_has_valid_verdict(outdir, short, marker=marker)
+if ok and t:
+    print(t.get("raw") or json.dumps(t, indent=2))
 else:
-    print("NO_VALID_VERDICT")
-    blob = vl.collect_agent_blob(outdir, short)
-    print((blob or "")[-1500:])
+    failure = vl.agent_terminal_failure(outdir, short)
+    if failure:
+        print("TERMINAL_FAILURE: " + json.dumps(failure, ensure_ascii=False))
+    else:
+        print("NO_VALID_VERDICT")
+        blob = vl.collect_agent_blob(outdir, short)
+        print((blob or "")[-1500:])
 ' "$SKILL_DIR" "$OUTDIR" "$short" "$MARKER" "$st"
     echo
   } | tee -a "$OUTDIR/results/summary.txt" >/dev/null
