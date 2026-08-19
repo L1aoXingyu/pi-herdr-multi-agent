@@ -2,10 +2,10 @@
 # Use when quota allows or for high-stakes reviews:
 #   bash launch.sh ... --fleet-file "$SKILL_DIR/fleet.full"
 #
-# Daily default is fleet.defaults (usual eight). Same line format.
-# Add-back order from seven → ten when opencode-go quota improves:
-#   mimopro → hy3  (+ dsv4flash for non-SF DeepSeek path)
-# Daily Go seat is glm53 (replaced qwen38max). Keep glm52 as the free SF vote.
+# Daily default is fleet.defaults (usual nine). Same line format.
+# Add-back remaining diversity on top of the nine:
+#   mimopro + dsv4flash (non-SF DeepSeek path)
+# Daily Go seats are glm53 + hy3 (Go quota 8x). Keep glm52 as the free SF vote.
 # Kimi K3 is cursor-cli only (k3max); opencode-go k3 is out of both fleets.
 # qwen38max is out unless explicitly --agent'd.
 
