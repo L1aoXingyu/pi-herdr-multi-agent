@@ -49,8 +49,8 @@ pi install git:github.com/L1aoXingyu/pi-herdr-multi-agent
 | `launch.sh` | Create tab, split panes, serial `agent start`, prompt fanout |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual seven** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **usual ten** / max diversity |
+| `fleet.defaults` | Author daily default — **usual eight** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **usual eleven** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -95,14 +95,15 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual seven** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual eight** (daily lean profile):
 
 - anchors: Codex `gpt-5.6-sol:xhigh` + Cursor `claude-fable-5-thinking-high`
 - second Cursor seat: `k3max=cursor:kimi-k3-max`
 - one opencode-go seat (`glm53`) — scarce quota; replaced `qwen38max`
 - all SiliconFlow seats kept (unlimited token account on the author's side)
+- Dots seat `dots3=dots/dots3-note-prev:max` (Anthropic-compat; official thinking cap is max)
 
-Heavy / max-diversity **usual ten** lives in `fleet.full`:
+Heavy / max-diversity **usual eleven** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
@@ -209,8 +210,9 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
 - Cursor default seats: `fable5=cursor:claude-fable-5-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
-- Dual fleet profiles: **usual seven** `fleet.defaults` (daily) + **usual ten** `fleet.full` (heavy)
+- Dual fleet profiles: **usual eight** `fleet.defaults` (daily) + **usual eleven** `fleet.full` (heavy)
 - Daily Go seat is `glm53=opencode-go/glm-5.3:max` (replaced `qwen38max`); SiliconFlow `glm52` stays
+- Dots seat `dots3=dots/dots3-note-prev:max` on both profiles
 - Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
 - Classify terminal provider/model errors (including `429` quota exhaustion) from structured Pi session records
