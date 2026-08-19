@@ -1,4 +1,4 @@
-# Default multi-model fleet for herdr-multi-agent — author's usual seven (daily).
+# Default multi-model fleet for herdr-multi-agent — author's usual eight (daily).
 #
 # Heavy / max-diversity list: see fleet.full (pass --fleet-file $SKILL_DIR/fleet.full).
 #
@@ -11,7 +11,7 @@
 #
 # launch.sh runs kind-aware model preflight (unless --skip-model-preflight):
 #   pi     -> pi --list-models
-#   cursor -> agent|cursor-agent --list-models
+#   cursor -> cursor-agent --list-models (bare `agent` only if it is cursor-cli)
 # and fails fast if entries are missing.
 #
 # Format:
@@ -21,11 +21,13 @@
 #
 # Rationale (2026-08-12 dual-review gpt56sol + fable5;
 #            2026-08-14 Go seat: glm53 replaces qwen38max;
-#            2026-08-16 Cursor seat: k3max added):
+#            2026-08-16 Cursor seat: k3max added;
+#            2026-08-19 Dots seat: dots3 at max thinking):
 #   - Keep anchors: sol-xhigh + cursor fable thinking-high
 #   - Second Cursor seat: k3max=cursor:kimi-k3-max (cursor-cli now lists it)
 #   - One opencode-go seat only (glm53) — scarce quota; quality > qwen3.8-max
 #   - Keep all SiliconFlow seats (unlimited token account), including glm52
+#   - Dots 3 Note Prev is Anthropic-compat; official thinking cap is max
 #   - Drop opencode-go k3 entirely; mimopro/hy3/dsv4flash stay in fleet.full; qwen38max is out
 
 gpt56sol=openai-codex/gpt-5.6-sol:xhigh
@@ -33,6 +35,7 @@ glm53=opencode-go/glm-5.3:max
 dsv4pro=siliconflow/deepseek-ai/DeepSeek-V4-Pro:high
 glm52=siliconflow/zai-org/GLM-5.2:max
 k27code=siliconflow/moonshotai/Kimi-K2.7-Code:high
+dots3=dots/dots3-note-prev:max
 # Cursor CLI (herdr kind=cursor → cursor-agent/agent); --trust --force at launch
 fable5=cursor:claude-fable-5-thinking-high
 k3max=cursor:kimi-k3-max
