@@ -28,16 +28,16 @@ Install as a pi package: `pi install git:github.com/L1aoXingyu/pi-herdr-multi-ag
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual nine below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual seven below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual nine models (default / daily fleet)
+### Usual seven models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
-When the user does **not** specify models/names (or says "the usual nine" / "the usual eight" /
-"the usual seven" / "the usual six" / "default agents" / "daily fleet"), launch exactly this fleet:
+When the user does **not** specify models/names (or says "the usual seven" / "the usual six" /
+"the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
 
 | Name | Kind | Model |
 |---|---|---|
@@ -45,13 +45,11 @@ When the user does **not** specify models/names (or says "the usual nine" / "the
 | `glm53` | `pi` | `opencode-go/glm-5.3:max` |
 | `hy3` | `pi` | `opencode-go/hy3:max` |
 | `dsv4pro` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Pro:high` |
-| `glm52` | `pi` | `siliconflow/zai-org/GLM-5.2:max` |
-| `k27code` | `pi` | `siliconflow/moonshotai/Kimi-K2.7-Code:high` |
 | `dots3` | `pi` | `dots/dots3-note-prev:max` |
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 
-### Full eleven models (heavy fleet)
+### Full nine models (heavy fleet)
 
 When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
@@ -59,11 +57,12 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` and `dsv4flash` (deepseek direct) on top of the nine.
-Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x); SiliconFlow `glm52` stays as the free GLM vote.
+Adds back opencode-go `mimopro` and `dsv4flash` (deepseek direct) on top of the seven.
+Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x). SiliconFlow daily seat is `dsv4pro` only;
+`glm52` and `k27code` are out of both fleets (out of date).
 Dots seat is `dots3` at official max thinking. Kimi K3 is cursor-cli only (`k3max`);
 opencode-go `k3` is out of both fleets.
-Phrase map: **usual nine = defaults** (legacy: usual eight / seven / six); **usual eleven = fleet.full** (legacy: usual ten).
+Phrase map: **usual seven = defaults** (legacy: usual nine / eight / six); **heavy nine = fleet.full** (legacy: usual eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
@@ -207,10 +206,10 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual nine); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual seven); optional --agent name=model ...
   # optional --agent fable5=cursor:claude-fable-5-thinking-high  (mixed kind)
   # optional --agent k3max=cursor:kimi-k3-max
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => usual eleven / heavy
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy nine / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --keep / --no-close  => do not auto-close after synthesis
