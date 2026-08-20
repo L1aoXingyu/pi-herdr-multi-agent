@@ -43,16 +43,16 @@ Grok has **no** pi `bg_run` / `bg-task`. Do not look for those tools.
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual nine below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual seven below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual nine models (default / daily fleet)
+### Usual seven models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
-When the user does **not** specify models/names (or says "the usual nine" / "the usual eight" /
-"the usual seven" / "the usual six" / "default agents" / "daily fleet"), launch exactly this fleet:
+When the user does **not** specify models/names (or says "the usual seven" / "the usual six" /
+"the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
 
 | Name | Kind | Model |
 |---|---|---|
@@ -60,13 +60,11 @@ When the user does **not** specify models/names (or says "the usual nine" / "the
 | `glm53` | `pi` | `opencode-go/glm-5.3:max` |
 | `hy3` | `pi` | `opencode-go/hy3:max` |
 | `dsv4pro` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Pro:high` |
-| `glm52` | `pi` | `siliconflow/zai-org/GLM-5.2:max` |
-| `k27code` | `pi` | `siliconflow/moonshotai/Kimi-K2.7-Code:high` |
 | `dots3` | `pi` | `dots/dots3-note-prev:max` |
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 
-### Full eleven models (heavy fleet)
+### Full nine models (heavy fleet)
 
 When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
@@ -74,11 +72,12 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` and `dsv4flash` (deepseek direct) on top of the nine.
-Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x); SiliconFlow `glm52` stays as the free GLM vote.
+Adds back opencode-go `mimopro` and `dsv4flash` (deepseek direct) on top of the seven.
+Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x). SiliconFlow daily seat is `dsv4pro` only;
+`glm52` and `k27code` are out of both fleets (out of date).
 Dots seat is `dots3` at official max thinking. Kimi K3 is cursor-cli only (`k3max`);
 opencode-go `k3` is out of both fleets.
-Phrase map: **usual nine = defaults** (legacy: usual eight / seven / six); **usual eleven = fleet.full** (legacy: usual ten).
+Phrase map: **usual seven = defaults** (legacy: usual nine / eight / six); **heavy nine = fleet.full** (legacy: usual eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
@@ -169,7 +168,9 @@ Official:
 
 - **Submit** with plain `herdr agent prompt` (no `--wait`) then poll `agent list` for
   `working|done|idle|blocked`. Reason: multi-model fanout + slow TUI paint made
-  `agent_prompt_stalled` flaky when `--wait` raced startup.
+  `agent_prompt_stalled` flaky when `--wait` raced startup. `launch.sh` runs that
+  submit+poll per started agent **in parallel** after serial start (`--serial-prompt`
+  restores one-by-one). Still never `prompt --wait`.
 - **Fleet completion** uses `watchdog.sh` (name-based poll + VERDICT harvest), not N blocking
   `agent prompt --wait` calls in the main turn.
 - **Single-agent recovery** may use `herdr agent wait <name> --until idle --until done --until blocked --timeout ...`
@@ -198,6 +199,7 @@ Official:
 ## Hard rules (from production failures)
 
 1. **Serial `herdr agent start`** — never start all panes in one parallel blast; race → flaky ready state.
+   Prompt fanout after start is parallel in `launch.sh` (see `--serial-prompt`).
 2. **Pane must be an idle shell** before start. Fresh panes often report `agent_pane_busy` /
    "not an available shell". Fix: wait + `send-keys enter` + retry (up to ~60s).
 3. **Do not hardcode pane ids across sessions** — always record the map from this launch
@@ -226,12 +228,13 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual nine); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual seven); optional --agent name=model ...
   # optional --agent fable5=cursor:claude-fable-5-thinking-high  (mixed kind)
   # optional --agent k3max=cursor:kimi-k3-max
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => usual eleven / heavy
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy nine / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
+  # optional --serial-prompt  => wait for each prompt accept before the next
   # optional --keep / --no-close  => do not auto-close after synthesis
 
 # background: true on run_terminal_command (never foreground-poll; no bg_run):
@@ -380,12 +383,16 @@ Notes:
 
 ### 4. Prompt all agents
 
+`launch.sh` fans these out concurrently (one job per started agent). Manual SOP
+may submit sequentially; do not use `--wait` either way.
+
 ```bash
 PROMPT=$(cat "$OUTDIR/prompt.txt")
 for herdr_name in ...; do
   # no --wait (avoid agent_prompt_stalled races on fanout); poll list instead
-  herdr agent prompt "$herdr_name" "$PROMPT"
+  herdr agent prompt "$herdr_name" "$PROMPT" &
 done
+wait
 ```
 
 Within ~10s, expect `agent_status=working` (or already settled `done`/`idle` if the model was instant).

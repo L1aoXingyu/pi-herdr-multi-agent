@@ -18,10 +18,11 @@ Usage: launch.sh --label NAME --cwd PATH --outdir PATH --prompt-file PATH \
   [--fleet-file PATH]
   [--workspace ID] [--session-prefix STR] [--start-timeout-ms N] [--ready-retries N]
   [--skip-model-preflight] [--kind KIND]
-  [--keep|--no-close] [--force]
+  [--serial-prompt|--parallel-prompt] [--keep|--no-close] [--force]
 
 Creates a Herdr tab, splits panes, starts agents serially with shell-ready retries,
-prompts every agent, writes mapping + policy under outdir.
+prompts every started agent (parallel fanout by default), writes mapping + policy
+under outdir. --serial-prompt waits for each prompt accept before the next.
 
 If no --agent is given, loads name=model lines from --fleet-file (default:
 $SKILL_DIR/fleet.defaults).
@@ -54,6 +55,7 @@ READY_RETRIES=12
 AUTO_CLOSE=1
 FORCE=0
 SKIP_MODEL_PREFLIGHT=0
+PARALLEL_PROMPT=1
 AGENT_KIND="pi"
 AGENTS=()
 TAB_ID=""
@@ -73,6 +75,8 @@ while [[ $# -gt 0 ]]; do
     --agent) AGENTS+=("${2:?}"); shift 2 ;;
     --kind) AGENT_KIND=${2:?}; shift 2 ;;
     --skip-model-preflight) SKIP_MODEL_PREFLIGHT=1; shift ;;
+    --serial-prompt) PARALLEL_PROMPT=0; shift ;;
+    --parallel-prompt) PARALLEL_PROMPT=1; shift ;;
     --keep|--no-close) AUTO_CLOSE=0; shift ;;
     --force) FORCE=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -568,8 +572,40 @@ print(fl.nonpi_prompt_policy(idle_ticks=int(sys.argv[2]), landed=sys.argv[3]=="1
   return 1
 }
 
+prompt_one() {
+  # $1 short  $2 herdr_name  $3 kind
+  # Writes $OUTDIR/$short/prompt_status.txt so parallel jobs do not clobber agents.json.
+  local short=$1 herdr_name=$2 kind=$3
+  local stfile="$OUTDIR/$short/prompt_status.txt"
+  mkdir -p "$OUTDIR/$short"
+  log "prompting $herdr_name kind=$kind"
+  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS" "$kind"; then
+    log "prompted $herdr_name (accepted)"
+    printf '%s\n' "working" >"$stfile"
+    return 0
+  fi
+  log "prompt failed $herdr_name"
+  printf '%s\n' "failed" >"$stfile"
+  return 1
+}
+
+apply_prompt_statuses() {
+  python3 - <<'PY' "$OUTDIR"
+import json, sys
+from pathlib import Path
+outdir = Path(sys.argv[1])
+rows = json.loads((outdir / "agents.json").read_text())
+for r in rows:
+    if r.get("start_status") != "started":
+        continue
+    p = outdir / r["name"] / "prompt_status.txt"
+    r["prompt_status"] = p.read_text().strip() if p.exists() else "unknown"
+(outdir / "agents.json").write_text(json.dumps(rows, indent=2) + "\n")
+PY
+}
+
 # --- preflight ---
-log "preflight label=$LABEL cwd=$CWD agents=${#AGENTS[@]} prefix=$SESSION_PREFIX kind=$AGENT_KIND"
+log "preflight label=$LABEL cwd=$CWD agents=${#AGENTS[@]} prefix=$SESSION_PREFIX kind=$AGENT_KIND parallel_prompt=$PARALLEL_PROMPT"
 herdr status >/dev/null
 model_preflight
 AGENTS_JSON=$(validate_and_expand_agents)
@@ -598,6 +634,7 @@ Path("$OUTDIR/policy.json").write_text(json.dumps({
     "tab_id": "$TAB_ID",
     "agent_kind_default": "$AGENT_KIND",
     "agent_kinds": kinds,
+    "parallel_prompt": bool(int("$PARALLEL_PROMPT")),
     "close_after": "main_agent_synthesis",
     "keep_on_partial_or_blocked": True,
 }, indent=2) + "\n")
@@ -687,7 +724,16 @@ print(json.dumps(rows, indent=2))
 PY
 
 # --- prompt started agents ---
+# Default: one background job per started agent (submit+accept wait overlap).
+# --serial-prompt: old one-by-one wait. agent start stays serial either way.
 PROMPT_FILE_ABS=$(abspath "$PROMPT_FILE")
+PROMPT_PIDS=()
+PROMPT_N=0
+PROMPT_MODE=serial
+if [[ "$PARALLEL_PROMPT" -eq 1 ]]; then
+  PROMPT_MODE=parallel
+fi
+log "prompt-fanout start mode=$PROMPT_MODE"
 for row in "${ROWS[@]}"; do
   IFS='|' read -r short herdr_name model pane kind <<<"$row"
   st=$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]));
@@ -696,20 +742,27 @@ print(next(r["start_status"] for r in rows if r["name"]==sys.argv[2]))' "$OUTDIR
     log "skip prompt $herdr_name (start_status=$st)"
     continue
   fi
-  log "prompting $herdr_name kind=$kind"
-  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS" "$kind"; then
-    log "prompted $herdr_name (accepted)"
-    python3 -c 'import json,sys; p=sys.argv[1]; n=sys.argv[2]; rows=json.load(open(p));
-[(r.update({"prompt_status":"working"}) if r["herdr_name"]==n else None) for r in rows];
-json.dump(rows, open(p,"w"), indent=2); open(p,"a").write("\n")' "$OUTDIR/agents.json" "$herdr_name"
+  PROMPT_N=$((PROMPT_N + 1))
+  if [[ "$PARALLEL_PROMPT" -eq 1 ]]; then
+    prompt_one "$short" "$herdr_name" "$kind" &
+    PROMPT_PIDS+=($!)
   else
-    FAIL=1
-    log "prompt failed $herdr_name"
-    python3 -c 'import json,sys; p=sys.argv[1]; n=sys.argv[2]; rows=json.load(open(p));
-[(r.update({"prompt_status":"failed"}) if r["herdr_name"]==n else None) for r in rows];
-json.dump(rows, open(p,"w"), indent=2); open(p,"a").write("\n")' "$OUTDIR/agents.json" "$herdr_name"
+    prompt_one "$short" "$herdr_name" "$kind" || FAIL=1
   fi
 done
+if [[ "$PARALLEL_PROMPT" -eq 1 && ${#PROMPT_PIDS[@]} -gt 0 ]]; then
+  log "prompt-fanout waiting n=${#PROMPT_PIDS[@]}"
+  set +e
+  for pid in "${PROMPT_PIDS[@]}"; do
+    wait "$pid"
+    if [[ $? -ne 0 ]]; then
+      FAIL=1
+    fi
+  done
+  set -e
+fi
+log "prompt-fanout done mode=$PROMPT_MODE n=$PROMPT_N fail=$FAIL"
+apply_prompt_statuses
 
 herdr agent list | python3 -c '
 import json,sys

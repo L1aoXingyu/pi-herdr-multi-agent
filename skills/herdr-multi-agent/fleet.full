@@ -1,11 +1,12 @@
-# Heavy / max-diversity fleet — author's full eleven.
+# Heavy / max-diversity fleet — author's full nine.
 # Use when quota allows or for high-stakes reviews:
 #   bash launch.sh ... --fleet-file "$SKILL_DIR/fleet.full"
 #
-# Daily default is fleet.defaults (usual nine). Same line format.
-# Add-back remaining diversity on top of the nine:
+# Daily default is fleet.defaults (usual seven). Same line format.
+# Add-back remaining diversity on top of the seven:
 #   mimopro + dsv4flash (non-SF DeepSeek path)
-# Daily Go seats are glm53 + hy3 (Go quota 8x). Keep glm52 as the free SF vote.
+# Daily Go seats are glm53 + hy3 (Go quota 8x).
+# glm52 and k27code are out of both fleets (out of date).
 # Kimi K3 is cursor-cli only (k3max); opencode-go k3 is out of both fleets.
 # qwen38max is out unless explicitly --agent'd.
 
@@ -15,8 +16,6 @@ mimopro=opencode-go/mimo-v2.5-pro:max
 hy3=opencode-go/hy3:max
 dsv4pro=siliconflow/deepseek-ai/DeepSeek-V4-Pro:high
 dsv4flash=deepseek/deepseek-v4-flash:max
-glm52=siliconflow/zai-org/GLM-5.2:max
-k27code=siliconflow/moonshotai/Kimi-K2.7-Code:high
 dots3=dots/dots3-note-prev:max
 fable5=cursor:claude-fable-5-thinking-high
 k3max=cursor:kimi-k3-max
