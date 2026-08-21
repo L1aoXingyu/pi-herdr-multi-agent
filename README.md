@@ -87,7 +87,7 @@ Shipped `fleet.defaults` is the **author's usual seven** (daily lean profile):
 - second Cursor seat: `k3max=cursor:kimi-k3-max`
 - two opencode-go seats (`glm53` + `hy3`) — Go quota expanded 8x; `glm53` replaced `qwen38max`
 - Zen free seat: `oxalpha=opencode/x-preview-f-free:max` (Ox Alpha; not on Go)
-- SiliconFlow daily seat is `dsv4pro` only; `glm52`, `k27code`, and `dots3` are out of both fleets
+- SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731); `glm52`, `k27code`, `dsv4pro`, and `dots3` are out of both fleets
 
 Heavy / max-diversity **nine** lives in `fleet.full`:
 

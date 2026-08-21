@@ -45,7 +45,7 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 | `glm53` | `pi` | `opencode-go/glm-5.3:max` |
 | `hy3` | `pi` | `opencode-go/hy3:max` |
 | `oxalpha` | `pi` | `opencode/x-preview-f-free:max` |
-| `dsv4pro` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Pro:high` |
+| `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 
@@ -57,10 +57,10 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` and `dsv4flash` (deepseek direct) on top of the seven.
+Adds back opencode-go `mimopro` and `dsflash` (deepseek direct `deepseek-v4-flash:max`) on top of the seven.
 Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x). Zen free seat is `oxalpha`.
-SiliconFlow daily seat is `dsv4pro` only;
-`glm52`, `k27code`, and `dots3` are out of both fleets.
+SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`);
+`glm52`, `k27code`, `dsv4pro`, and `dots3` are out of both fleets.
 Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.
 Phrase map: **usual seven = defaults** (legacy: usual six / nine / eight); **heavy nine = fleet.full** (legacy: usual eleven / ten / eight).
 
