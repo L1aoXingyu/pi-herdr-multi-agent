@@ -14,7 +14,7 @@
 #
 # Shipped profiles (author-specific; only work if configured):
 #   fleet.defaults  — usual seven (daily)
-#   fleet.full      — full nine (heavy)
+#   fleet.full      — full eight (heavy)
 
 # Minimal 3-model example (replace with models you actually have):
 # rev-a=openai-codex/gpt-5.6-sol:xhigh
