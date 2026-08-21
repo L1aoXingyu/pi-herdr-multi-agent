@@ -49,7 +49,7 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 
-### Full nine models (heavy fleet)
+### Full eight models (heavy fleet)
 
 When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
@@ -57,12 +57,12 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` and `dsflash` (deepseek direct `deepseek-v4-flash:max`) on top of the seven.
+Adds back opencode-go `mimopro` on top of the seven.
 Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x). Zen free seat is `oxalpha`.
 SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`);
-`glm52`, `k27code`, `dsv4pro`, and `dots3` are out of both fleets.
+`glm52`, `k27code`, `dsv4pro`, `dsflash`, and `dots3` are out of both fleets.
 Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.
-Phrase map: **usual seven = defaults** (legacy: usual six / nine / eight); **heavy nine = fleet.full** (legacy: usual eleven / ten / eight).
+Phrase map: **usual seven = defaults** (legacy: usual six / nine / eight); **heavy eight = fleet.full** (legacy: usual eleven / ten / nine).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
@@ -209,7 +209,7 @@ bash "$SKILL_DIR/launch.sh" \
   # omit --agent => fleet.defaults (usual seven); optional --agent name=model ...
   # optional --agent fable5=cursor:claude-fable-5-thinking-high  (mixed kind)
   # optional --agent k3max=cursor:kimi-k3-max
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy nine / fleet.full
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy eight / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --keep / --no-close  => do not auto-close after synthesis
