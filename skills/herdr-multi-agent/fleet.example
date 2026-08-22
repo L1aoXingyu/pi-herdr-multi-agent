@@ -25,7 +25,7 @@
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 glm53=opencode-go/glm-5.3:max
 hy3=opencode-go/hy3:max
-oxalpha=opencode/x-preview-f-free:max
+oxalpha=openrouter/stealth/ox-alpha:max
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 fable5=cursor:claude-fable-5-thinking-high
 k3max=cursor:kimi-k3-max
