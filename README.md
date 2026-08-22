@@ -100,7 +100,7 @@ Shipped `fleet.defaults` is the **author's usual seven** (daily lean profile):
 - anchors: Cursor `gpt-5.6-sol-xhigh` + Cursor `claude-fable-5-thinking-high`
 - third Cursor seat: `k3max=cursor:kimi-k3-max`
 - two opencode-go seats (`glm53` + `hy3`) — Go quota expanded 8x; `glm53` replaced `qwen38max`
-- Zen free seat: `oxalpha=opencode/x-preview-f-free:max` (Ox Alpha; not on Go)
+- OpenRouter seat: `oxalpha=openrouter/stealth/ox-alpha:max` (Ox Alpha; not OpenCode Zen/Go)
 - SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731); `glm52`, `k27code`, `dsv4pro`, and `dots3` are out of both fleets.
 
 Heavy / max-diversity **eight** lives in `fleet.full`:
@@ -211,7 +211,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 - Cursor default seats: `fable5=cursor:claude-fable-5-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
 - Dual fleet profiles: **usual seven** `fleet.defaults` (daily) + **heavy eight** `fleet.full`
-- Daily Go seats are `glm53=opencode-go/glm-5.3:max` and `hy3=opencode-go/hy3:max` (Go quota 8x); Zen free seat `oxalpha=opencode/x-preview-f-free:max`; `glm52` / `k27code` / `dots3` dropped
+- Daily Go seats are `glm53=opencode-go/glm-5.3:max` and `hy3=opencode-go/hy3:max` (Go quota 8x); OpenRouter seat `oxalpha=openrouter/stealth/ox-alpha:max`; `glm52` / `k27code` / `dots3` dropped
 - Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
 - Classify terminal provider/model errors (including `429` quota exhaustion) from structured Pi session records

@@ -59,7 +59,7 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 | `gpt56sol` | `cursor` | `gpt-5.6-sol-xhigh` (via cursor-cli `agent`/`cursor-agent`) |
 | `glm53` | `pi` | `opencode-go/glm-5.3:max` |
 | `hy3` | `pi` | `opencode-go/hy3:max` |
-| `oxalpha` | `pi` | `opencode/x-preview-f-free:max` |
+| `oxalpha` | `pi` | `openrouter/stealth/ox-alpha:max` |
 | `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
@@ -73,7 +73,7 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 ```
 
 Adds back opencode-go `mimopro` on top of the seven.
-Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x). Zen free seat is `oxalpha`.
+Daily Go seats are `glm53` and `hy3` (Go quota expanded 8x). OpenRouter seat is `oxalpha`.
 SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`);
 `glm52`, `k27code`, `dsv4pro`, `dsflash`, and `dots3` are out of both fleets.
 Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.

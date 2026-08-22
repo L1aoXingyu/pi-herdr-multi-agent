@@ -27,11 +27,12 @@
 #            2026-08-20 drop dots3 as unusable;
 #            2026-08-21 Zen free oxalpha: Ox Alpha / x-preview-f-free:max
 #            2026-08-21 SiliconFlow daily: dsv4flash 0731 replaces dsv4pro preview
-#            2026-08-22 gpt56sol: ChatGPT Codex sub dead; switch to cursor:gpt-5.6-sol-xhigh):
+#            2026-08-22 gpt56sol: ChatGPT Codex sub dead; switch to cursor:gpt-5.6-sol-xhigh
+#            2026-08-22 oxalpha: OpenRouter stealth/ox-alpha (OpenCode Go/Zen unstable)):
 #   - Keep anchors: cursor sol-xhigh + cursor fable thinking-high
 #   - Cursor seats: gpt56sol + fable5 + k3max
 #   - Two opencode-go seats (glm53 + hy3) — Go quota expanded 8x
-#   - Zen free seat oxalpha=opencode/x-preview-f-free:max (not Go; Go 401s this id)
+#   - OpenRouter seat oxalpha=openrouter/stealth/ox-alpha:max (not OpenCode Zen/Go)
 #   - SiliconFlow daily seat is dsv4flash (V4-Flash-0731; public id DeepSeek-V4-Flash, not -0731)
 #   - glm52, k27code, dsv4pro, and dots3 are out of both fleets
 #   - Drop opencode-go k3 entirely; mimopro stays in fleet.full; qwen38max is out
@@ -39,7 +40,7 @@
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 glm53=opencode-go/glm-5.3:max
 hy3=opencode-go/hy3:max
-oxalpha=opencode/x-preview-f-free:max
+oxalpha=openrouter/stealth/ox-alpha:max
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 # Cursor CLI (herdr kind=cursor → cursor-agent/agent); --trust --force at launch
 fable5=cursor:claude-fable-5-thinking-high
