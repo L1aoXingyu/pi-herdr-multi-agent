@@ -41,7 +41,7 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 
 | Name | Kind | Model |
 |---|---|---|
-| `gpt56sol` | `pi` | `openai-codex/gpt-5.6-sol:xhigh` |
+| `gpt56sol` | `cursor` | `gpt-5.6-sol-xhigh` (via cursor-cli `agent`/`cursor-agent`) |
 | `glm53` | `pi` | `opencode-go/glm-5.3:max` |
 | `hy3` | `pi` | `opencode-go/hy3:max` |
 | `oxalpha` | `pi` | `opencode/x-preview-f-free:max` |
@@ -68,7 +68,7 @@ Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable5=cursor:claude-fable-5-thinking-high`)
 
-**Cursor dependency / security:** default fleet includes two cursor agents (`fable5`, `k3max`). Requires `agent` or
+**Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable5`, `k3max`). Requires `agent` or
 `cursor-agent` on PATH and a logged-in Cursor account. Launch uses `--trust --force`
 (= UI **Run Everything**): shell/tools auto-approve unless explicitly denied. Same blast radius
 as unsupervised pi reviewers with full tools — intentional for unattended mixed fleets.
@@ -207,7 +207,8 @@ bash "$SKILL_DIR/launch.sh" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
   # omit --agent => fleet.defaults (usual seven); optional --agent name=model ...
-  # optional --agent fable5=cursor:claude-fable-5-thinking-high  (mixed kind)
+  # optional --agent gpt56sol=cursor:gpt-5.6-sol-xhigh  (mixed kind)
+  # optional --agent fable5=cursor:claude-fable-5-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
   # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy eight / fleet.full
   # optional --fleet-file PATH  => custom name=model list
@@ -340,8 +341,8 @@ Notes:
   "herdr_name": "my-review-gpt56sol",
   "pane_id": "w5:pX",
   "tab_id": "w5:t9",
-  "model": "openai-codex/gpt-5.6-sol:xhigh",
-  "kind": "pi",
+  "model": "gpt-5.6-sol-xhigh",
+  "kind": "cursor",
   "start_status": "started"
 },{
   "name": "fable5",
