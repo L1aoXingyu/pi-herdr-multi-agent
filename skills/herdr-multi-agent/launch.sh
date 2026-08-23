@@ -258,13 +258,15 @@ model_preflight() {
     log "model preflight skipped"
     return 0
   fi
-  python3 - <<'PY' "$SKILL_DIR" "$AGENT_KIND" "${AGENTS[@]}"
+  python3 - <<'PY' "$SKILL_DIR" "$AGENT_KIND" "$OUTDIR" "${AGENTS[@]}"
 import sys
+from pathlib import Path
 sys.path.insert(0, sys.argv[1])
 import fleet_lib as fl
 
 default_kind = (sys.argv[2] or "pi").strip().lower() or "pi"
-specs = sys.argv[3:]
+outdir = Path(sys.argv[3])
+specs = sys.argv[4:]
 try:
     missing, skipped = fl.preflight_specs(specs, default_kind, hard_fail_missing_cli=True)
 except fl.FleetError as e:
@@ -277,12 +279,31 @@ if missing:
         + "\nFix auth/CLI login, pass different --agent/--fleet-file, or --skip-model-preflight\n"
     )
     sys.exit(3)
+skipped_set = set(skipped)
+kept = []
+for spec in specs:
+    if "=" not in spec:
+        continue
+    _short, kind, _model = fl.parse_agent_spec(spec, default_kind)
+    if kind in skipped_set:
+        print(f"WARN: dropping {spec} (kind={kind} unavailable)", file=sys.stderr)
+        continue
+    kept.append(spec)
+if not kept:
+    sys.stderr.write("model preflight dropped every agent\n")
+    sys.exit(3)
+(outdir / "kept_specs.txt").write_text("\n".join(kept) + "\n")
 for k in skipped:
     if k not in ("pi", "cursor"):
         print(f"WARN: no model preflight for kind={k}; continuing", file=sys.stderr)
-n = sum(1 for s in specs if "=" in s)
-print("model_preflight_ok", n, "skipped_kinds=", ",".join(skipped) or "-")
+print("model_preflight_ok", len(kept), "skipped_kinds=", ",".join(skipped) or "-")
 PY
+  if [[ -f "$OUTDIR/kept_specs.txt" ]]; then
+    AGENTS=()
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      [[ -n "$line" ]] && AGENTS+=("$line")
+    done < "$OUTDIR/kept_specs.txt"
+  fi
 }
 
 start_agent_args() {
