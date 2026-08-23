@@ -70,7 +70,7 @@ Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable5=cursor:claude-fable-5-thinking-high`)
 
-**Antigravity seat:** `g37flash` is herdr kind `agy` (`agy --model gemini-3.7-flash-high --dangerously-skip-permissions`). Needs `agy` on PATH and a Google login. Missing `agy` fails preflight hard unless `--skip-model-preflight`. Mac-only today; GPU nodes do not have this CLI.
+**Antigravity seat:** `g37flash` is herdr kind `agy` (`agy --model gemini-3.7-flash-high --dangerously-skip-permissions`). Needs `agy` on PATH and a Google login. If `agy` is missing or `agy models` fails, launch **drops that seat** and continues the rest (GPU nodes).
 
 **Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable5`, `k3max`). Requires `agent` or
 `cursor-agent` on PATH and a logged-in Cursor account. Launch uses `--trust --force`

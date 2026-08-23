@@ -277,20 +277,12 @@ def preflight_specs(
                 if not match_model(hay, model, "cursor"):
                     missing.append(f"{short}=cursor:{model} ({bin_name} --list-models)")
         elif kind == "agy":
+            # Optional on GPU nodes: skip the seat instead of aborting the fleet.
             if not shutil.which("agy"):
-                if hard_fail_missing_cli:
-                    raise FleetError(
-                        "agy not on PATH but fleet has "
-                        f"{len(items)} antigravity agent(s); "
-                        "install Antigravity CLI, drop g37flash, "
-                        "or pass --skip-model-preflight"
-                    )
                 skipped.append(kind)
                 continue
             hay, err = load_cmd_output(["agy", "models"])
             if hay is None:
-                if hard_fail_missing_cli:
-                    raise FleetError(f"agy models failed ({err})")
                 skipped.append(kind)
                 continue
             for short, model in items:
