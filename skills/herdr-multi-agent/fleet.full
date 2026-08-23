@@ -1,9 +1,9 @@
-# Heavy / max-diversity fleet — author's full eight.
+# Heavy / max-diversity fleet — author's full nine.
 # Use when quota allows or for high-stakes reviews:
 #   bash launch.sh ... --fleet-file "$SKILL_DIR/fleet.full"
 #
-# Daily default is fleet.defaults (usual seven). Same line format.
-# Add-back remaining diversity on top of the seven:
+# Daily default is fleet.defaults (usual eight). Same line format.
+# Add-back remaining diversity on top of the eight:
 #   mimopro
 # Daily Go seats are glm53 + hy3 (Go quota 8x).
 # OpenRouter seat is oxalpha (openrouter/stealth/ox-alpha:max).
@@ -21,3 +21,4 @@ oxalpha=openrouter/stealth/ox-alpha:max
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 fable5=cursor:claude-fable-5-thinking-high
 k3max=cursor:kimi-k3-max
+g37flash=agy:gemini-3.7-flash-high

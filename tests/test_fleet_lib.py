@@ -66,6 +66,8 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual(model, "claude-fable-5-thinking-high")
         short, kind, model = fl.parse_agent_spec("k3max=cursor:kimi-k3-max")
         self.assertEqual((short, kind, model), ("k3max", "cursor", "kimi-k3-max"))
+        short, kind, model = fl.parse_agent_spec("g37flash=agy:gemini-3.7-flash-high")
+        self.assertEqual((short, kind, model), ("g37flash", "agy", "gemini-3.7-flash-high"))
 
 
 class MatchModelTests(unittest.TestCase):
@@ -112,6 +114,20 @@ gpt-5.5-high - GPT-5.5 1M High
         self.assertFalse(fl.match_model(self.CURSOR_HAY, "fable-5-high", "cursor"))
         self.assertFalse(fl.match_model(self.CURSOR_HAY, "typo-fable-5-high", "cursor"))
 
+    AGY_HAY = """
+gemini-3.7-flash-highGemini 3.7 Flash (High)
+gemini-3.7-flash-lowGemini 3.7 Flash (Low)
+gemini-3.1-pro-highGemini 3.1 Pro (High)
+"""
+
+    def test_agy_concatenated_id_name(self):
+        self.assertTrue(
+            fl.match_model(self.AGY_HAY, "gemini-3.7-flash-high", "agy")
+        )
+        self.assertTrue(fl.match_model(self.AGY_HAY, "gemini-3.7-flash-low", "agy"))
+        self.assertFalse(fl.match_model(self.AGY_HAY, "gemini-3.7-flash", "agy"))
+        self.assertFalse(fl.match_model(self.AGY_HAY, "gemini-3.5-flash-high", "agy"))
+
 
 class StartArgsTests(unittest.TestCase):
     def test_pi_args(self):
@@ -145,6 +161,21 @@ class StartArgsTests(unittest.TestCase):
                 "claude-fable-5-thinking-high",
                 "--trust",
                 "--force",
+            ],
+        )
+
+    def test_agy_args_skip_permissions(self):
+        self.assertEqual(
+            fl.start_native_args(
+                "agy",
+                "gemini-3.7-flash-high",
+                session_dir="/tmp/x/g",
+                herdr_name="rev-g37flash",
+            ),
+            [
+                "--model",
+                "gemini-3.7-flash-high",
+                "--dangerously-skip-permissions",
             ],
         )
 

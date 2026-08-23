@@ -107,6 +107,25 @@ def parse_agent_spec(spec: str, default_kind: str = "pi") -> tuple[str, str, str
     return short, kind, model
 
 
+def agy_model_ids(hay: str) -> set[str]:
+    """Extract model ids from `agy models` output.
+
+    Lines are often ``idName`` with no separator, e.g.
+    ``gemini-3.7-flash-highGemini 3.7 Flash (High)``.
+    """
+    ids: set[str] = set()
+    for line in hay.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # Stop before TitleCase name or whitespace. Do not IGNORECASE — G would
+        # be eaten as part of the id.
+        m = re.match(r"^([a-z0-9][a-z0-9._-]*)", line)
+        if m:
+            ids.add(m.group(1).lower())
+    return ids
+
+
 def cursor_model_ids(hay: str) -> set[str]:
     """Extract model ids from `agent --list-models` style output."""
     ids: set[str] = set()
@@ -162,6 +181,9 @@ def match_model(hay: str, model: str, kind: str) -> bool:
     if kind == "cursor":
         mid = m.lower()
         return mid in cursor_model_ids(hay)
+
+    if kind == "agy":
+        return m.lower() in agy_model_ids(hay)
 
     # Other kinds: exact line-prefix id match only (no bare substring).
     mid = m.lower()
@@ -274,6 +296,26 @@ def preflight_specs(
             for short, model in items:
                 if not match_model(hay, model, "cursor"):
                     missing.append(f"{short}=cursor:{model} ({bin_name} --list-models)")
+        elif kind == "agy":
+            if not shutil.which("agy"):
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        "agy not on PATH but fleet has "
+                        f"{len(items)} antigravity agent(s); "
+                        "install Antigravity CLI, drop g37flash, "
+                        "or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            hay, err = load_cmd_output(["agy", "models"])
+            if hay is None:
+                if hard_fail_missing_cli:
+                    raise FleetError(f"agy models failed ({err})")
+                skipped.append(kind)
+                continue
+            for short, model in items:
+                if not match_model(hay, model, "agy"):
+                    missing.append(f"{short}=agy:{model} (agy models)")
         else:
             # No generic list-models contract for other kinds yet.
             skipped.append(kind)
@@ -289,6 +331,8 @@ def start_native_args(kind: str, model: str, *, session_dir: str, herdr_name: st
     if kind == "cursor":
         # --trust: workspace trust; --force: Run Everything (unattended shell/tools)
         return ["--model", model, "--trust", "--force"]
+    if kind == "agy":
+        return ["--model", model, "--dangerously-skip-permissions"]
     return ["--model", model]
 
 
@@ -325,6 +369,9 @@ COLD_TITLES = frozenset(
         "cursor",
         "cursor cli",
         "agent",
+        "agy",
+        "antigravity",
+        "antigravity cli",
     }
 )
 PASTED_TEXT_RE = re.compile(r"\[\s*Pasted text #\d+", re.I)

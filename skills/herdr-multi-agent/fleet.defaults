@@ -1,4 +1,4 @@
-# Default multi-model fleet for herdr-multi-agent — author's usual seven (daily).
+# Default multi-model fleet for herdr-multi-agent — author's usual eight (daily).
 #
 # Heavy / max-diversity list: see fleet.full (pass --fleet-file $SKILL_DIR/fleet.full).
 #
@@ -28,9 +28,11 @@
 #            2026-08-21 Zen free oxalpha: Ox Alpha / x-preview-f-free:max
 #            2026-08-21 SiliconFlow daily: dsv4flash 0731 replaces dsv4pro preview
 #            2026-08-22 gpt56sol: ChatGPT Codex sub dead; switch to cursor:gpt-5.6-sol-xhigh
-#            2026-08-22 oxalpha: OpenRouter stealth/ox-alpha (OpenCode Go/Zen unstable)):
+#            2026-08-22 oxalpha: OpenRouter stealth/ox-alpha (OpenCode Go/Zen unstable)
+#            2026-08-23 g37flash: Antigravity CLI gemini-3.7-flash-high):
 #   - Keep anchors: cursor sol-xhigh + cursor fable thinking-high
 #   - Cursor seats: gpt56sol + fable5 + k3max
+#   - Antigravity seat: g37flash=agy:gemini-3.7-flash-high (Mac Google login)
 #   - Two opencode-go seats (glm53 + hy3) — Go quota expanded 8x
 #   - OpenRouter seat oxalpha=openrouter/stealth/ox-alpha:max (not OpenCode Zen/Go)
 #   - SiliconFlow daily seat is dsv4flash (V4-Flash-0731; public id DeepSeek-V4-Flash, not -0731)
@@ -45,3 +47,4 @@ dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 # Cursor CLI (herdr kind=cursor → cursor-agent/agent); --trust --force at launch
 fable5=cursor:claude-fable-5-thinking-high
 k3max=cursor:kimi-k3-max
+g37flash=agy:gemini-3.7-flash-high
