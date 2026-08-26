@@ -49,8 +49,8 @@ pi install git:github.com/L1aoXingyu/pi-herdr-multi-agent
 | `launch.sh` | Create tab, split panes, serial `agent start`, parallel prompt fanout (`--serial-prompt` to disable) |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual six** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **heavy seven** / max diversity |
+| `fleet.defaults` | Author daily default — **usual five** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **heavy six** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -95,16 +95,16 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual six** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
 
 - anchors: Cursor `gpt-5.6-sol-xhigh` + Cursor `claude-fable-5-thinking-high`
 - third Cursor seat: `k3max=cursor:kimi-k3-max`
 - no daily opencode-go seat; `hy3` and `glm53` are out of both fleets (OpenCode Go quota exhausted)
-- OpenRouter seat: `oxalpha=openrouter/stealth/ox-alpha:max` (Ox Alpha; not OpenCode Zen/Go)
-- SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731); `hy3`, `glm53`, `glm52`, `k27code`, `dsv4pro`, and `dots3` are out of both fleets.
+- no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
+- SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731); `oxalpha`, `hy3`, `glm53`, `glm52`, `k27code`, `dsv4pro`, and `dots3` are out of both fleets.
 - Antigravity seat: `g37flash=agy:gemini-3.7-flash-high`
 
-Heavy / max-diversity **seven** lives in `fleet.full`:
+Heavy / max-diversity **six** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
@@ -200,7 +200,8 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
-- Drop `hy3=opencode-go/hy3:max` from both fleets (OpenCode Go quota exhausted); daily is usual six, heavy is seven
+- Drop `oxalpha=openrouter/stealth/ox-alpha:max` from both fleets (OpenRouter stealth/ox-alpha unusable); daily is usual five, heavy is six
+- Drop `hy3=opencode-go/hy3:max` from both fleets (OpenCode Go quota exhausted)
 - Drop `glm53=opencode-go/glm-5.3:max` from both fleets (OpenCode Go quota exhausted)
 - Parent harness is Grok Build: `run_terminal_command` + `background: true` (no pi `bg_run`)
 - Cursor prompt recovery: `prompt_already_landed` / `nonpi_prompt_policy` — enter-only when the first paste already landed; no stacked full re-prompt
@@ -213,8 +214,8 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
 - Cursor default seats: `fable5=cursor:claude-fable-5-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
-- Dual fleet profiles: **usual six** `fleet.defaults` (daily) + **heavy seven** `fleet.full`
-- No daily Go seat; heavy Go seat is `mimopro` only. OpenRouter seat `oxalpha=openrouter/stealth/ox-alpha:max`; `hy3` / `glm53` / `glm52` / `k27code` / `dots3` dropped
+- Dual fleet profiles: **usual five** `fleet.defaults` (daily) + **heavy six** `fleet.full`
+- No daily Go seat; heavy Go seat is `mimopro` only. No OpenRouter seat; `oxalpha` / `hy3` / `glm53` / `glm52` / `k27code` / `dots3` dropped
 - Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
 - Classify terminal provider/model errors (including `429` quota exhaustion) from structured Pi session records
