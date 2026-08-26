@@ -43,11 +43,11 @@ Grok has **no** pi `bg_run` / `bg-task`. Do not look for those tools.
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual seven below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual six below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual seven models (default / daily fleet)
+### Usual six models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
@@ -57,14 +57,13 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 | Name | Kind | Model |
 |---|---|---|
 | `gpt56sol` | `cursor` | `gpt-5.6-sol-xhigh` (via cursor-cli `agent`/`cursor-agent`) |
-| `hy3` | `pi` | `opencode-go/hy3:max` |
 | `oxalpha` | `pi` | `openrouter/stealth/ox-alpha:max` |
 | `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 | `g37flash` | `agy` | `gemini-3.7-flash-high` (Antigravity CLI) |
 
-### Full eight models (heavy fleet)
+### Full seven models (heavy fleet)
 
 When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
@@ -72,13 +71,14 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` on top of the seven.
-Daily Go seat is `hy3`. OpenRouter seat is `oxalpha`.
+Adds back opencode-go `mimopro` on top of the six.
+Daily Go seat is none (`hy3` and `glm53` dropped: OpenCode Go quota exhausted). Heavy Go seat is `mimopro` only.
+OpenRouter seat is `oxalpha`.
 SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`);
 Antigravity daily seat is `g37flash=agy:gemini-3.7-flash-high`.
-`glm53`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, and `dots3` are out of both fleets.
+`hy3`, `glm53`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, and `dots3` are out of both fleets.
 Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.
-Phrase map: **usual seven = defaults** (legacy: usual eight / six / nine); **heavy eight = fleet.full** (legacy: usual nine / eleven / ten / eight).
+Phrase map: **usual six = defaults** (legacy: usual seven / eight / nine); **heavy seven = fleet.full** (legacy: usual eight / nine / eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
@@ -231,12 +231,12 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual seven); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual six); optional --agent name=model ...
   # optional --agent gpt56sol=cursor:gpt-5.6-sol-xhigh  (mixed kind)
   # optional --agent fable5=cursor:claude-fable-5-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
   # optional --agent g37flash=agy:gemini-3.7-flash-high
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy eight / fleet.full
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy seven / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --serial-prompt  => wait for each prompt accept before the next
