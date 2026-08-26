@@ -1,22 +1,21 @@
-# Heavy / max-diversity fleet — author's full seven.
+# Heavy / max-diversity fleet — author's full six.
 # Use when quota allows or for high-stakes reviews:
 #   bash launch.sh ... --fleet-file "$SKILL_DIR/fleet.full"
 #
-# Daily default is fleet.defaults (usual six). Same line format.
-# Add-back remaining diversity on top of the six:
+# Daily default is fleet.defaults (usual five). Same line format.
+# Add-back remaining diversity on top of the five:
 #   mimopro
 # Daily Go seat is none (hy3 and glm53 dropped: OpenCode Go quota exhausted).
 # Heavy Go seat is mimopro only.
-# OpenRouter seat is oxalpha (openrouter/stealth/ox-alpha:max).
+# No OpenRouter seat (oxalpha dropped: stealth/ox-alpha unusable).
 # SiliconFlow daily seat is dsv4flash (V4-Flash-0731).
-# hy3, glm53, glm52, k27code, dsv4pro, dsflash, and dots3 are out of both fleets.
+# oxalpha, hy3, glm53, glm52, k27code, dsv4pro, dsflash, and dots3 are out of both fleets.
 # gpt56sol is cursor-cli gpt-5.6-sol-xhigh (ChatGPT Codex sub path is dead).
 # Kimi K3 is cursor-cli only (k3max); opencode-go k3 is out of both fleets.
 # qwen38max is out unless explicitly --agent'd.
 
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 mimopro=opencode-go/mimo-v2.5-pro:max
-oxalpha=openrouter/stealth/ox-alpha:max
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 fable5=cursor:claude-fable-5-thinking-high
 k3max=cursor:kimi-k3-max
