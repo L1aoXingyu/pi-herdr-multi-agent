@@ -207,7 +207,8 @@ def load_cmd_output(cmd: list[str], timeout: float = 60.0) -> tuple[str | None, 
 
 
 def which_cursor_cli() -> str | None:
-    for cand in ("agent", "cursor-agent"):
+    """Prefer cursor-agent-proxy (37890 wrapper). Official auto-update overwrites cursor-agent/agent."""
+    for cand in ("cursor-agent-proxy", "cursor-agent", "agent"):
         if shutil.which(cand):
             return cand
     return None
@@ -262,7 +263,7 @@ def preflight_specs(
             if not bin_name:
                 if hard_fail_missing_cli:
                     raise FleetError(
-                        f"agent/cursor-agent not on PATH but fleet has {len(items)} cursor agent(s); "
+                        f"cursor-agent-proxy/cursor-agent not on PATH but fleet has {len(items)} cursor agent(s); "
                         "install cursor-cli or drop cursor entries / pass --skip-model-preflight"
                     )
                 skipped.append(kind)
