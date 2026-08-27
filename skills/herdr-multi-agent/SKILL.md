@@ -340,7 +340,8 @@ herdr agent start "$herdr_name" --kind pi --pane "$pane" --timeout 180000 -- \
   --name "$herdr_name"
 
 # cursor-cli via 37890 wrapper (not PATH cursor-agent — updater clobbers that name)
-herdr pane run "$pane" -- cursor-agent-proxy --model "$model" --trust --force
+# pane run has no `--` terminator; a leading `--` is typed as the command.
+herdr pane run "$pane" cursor-agent-proxy --model "$model" --trust --force
 # then herdr agent rename "$pane" "$herdr_name" once detection shows cursor
 ```
 
@@ -348,7 +349,7 @@ Notes:
 
 - `agent start` returns only after Herdr detects the expected agent and considers it ready (default
   start timeout 30s if you omit `--timeout`; this skill uses up to 180s, CLI max 300s).
-- Pass **kind-native** args only after `--` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`).
+- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`). Cursor uses `pane run` with no leading `--` (`cursor-agent-proxy --model`/`--trust`/`--force`); a bare `--` is typed into the shell.
 - Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
   still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
 - Mixed fleets are supported: each row in `agents.json` carries its own `kind`.
