@@ -324,10 +324,62 @@ sys.stdout.buffer.write(b"\0".join(a.encode() for a in args) + (b"\0" if args el
 PY
 }
 
+cursor_cli_bin() {
+  python3 - <<'PY' "$SKILL_DIR"
+import sys
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+print(fl.which_cursor_cli() or "")
+PY
+}
+
+# herdr --kind cursor types PATH `cursor-agent` (official updater clobber target).
+# Start the 37890 wrapper by name, then attach the herdr agent name.
+wait_name_cursor_pane() {
+  local pane=$1 herdr_name=$2 timeout_ms=$3
+  python3 - <<'PY' "$pane" "$herdr_name" "$timeout_ms"
+import json, subprocess, sys, time
+pane, name, timeout_ms = sys.argv[1], sys.argv[2], int(sys.argv[3])
+deadline = time.time() + max(timeout_ms, 3000) / 1000.0
+while time.time() < deadline:
+    p = subprocess.run(["herdr", "agent", "list"], capture_output=True, text=True)
+    try:
+        data = json.loads((p.stdout or "").strip() or "{}")
+    except json.JSONDecodeError:
+        time.sleep(1)
+        continue
+    agents = (data.get("result") or {}).get("agents") or []
+    for a in agents:
+        if a.get("pane_id") != pane:
+            continue
+        agent = (a.get("agent") or "").lower()
+        if agent not in ("cursor", "cursor-agent"):
+            continue
+        cur = a.get("name") or ""
+        if cur == name:
+            print("named")
+            raise SystemExit(0)
+        target = cur or pane
+        r = subprocess.run(
+            ["herdr", "agent", "rename", target, name],
+            capture_output=True, text=True,
+        )
+        if r.returncode == 0:
+            print("renamed")
+            raise SystemExit(0)
+        print("rename-failed", (r.stderr or r.stdout or "")[:300], file=sys.stderr)
+        raise SystemExit(1)
+    time.sleep(1)
+print("timeout waiting for cursor on", pane, file=sys.stderr)
+raise SystemExit(1)
+PY
+}
+
 start_agent() {
   local herdr_name=$1 pane=$2 model=$3 short=$4 kind=$5
   local i resp rc busy_retries=0 hard_fail_retries=0
   local -a native_args=()
+  local cursor_bin=""
   # busy shell: up to READY_RETRIES; other errors (bad model etc.): max 2 tries
   for ((i=1; i<=READY_RETRIES; i++)); do
     herdr pane send-keys "$pane" enter 2>/dev/null || true
@@ -337,9 +389,27 @@ start_agent() {
       native_args+=("$tok")
     done < <(start_agent_args "$kind" "$model" "$short" "$herdr_name")
     set +e
-    resp=$(herdr agent start "$herdr_name" --kind "$kind" --pane "$pane" --timeout "$START_TIMEOUT_MS" -- \
-      "${native_args[@]}" 2>&1)
-    rc=$?
+    if [[ "$kind" == "cursor" ]]; then
+      cursor_bin=$(cursor_cli_bin)
+      if [[ -z "$cursor_bin" ]]; then
+        rc=1
+        resp="cursor-agent-proxy/cursor-agent not on PATH"
+      else
+        resp=$(herdr pane run "$pane" -- "$cursor_bin" "${native_args[@]}" 2>&1)
+        rc=$?
+        if [[ $rc -eq 0 ]]; then
+          wait_name_cursor_pane "$pane" "$herdr_name" "$START_TIMEOUT_MS"
+          rc=$?
+          if [[ $rc -ne 0 ]]; then
+            resp="${resp}"$'\n'"wait_name_cursor_pane failed"
+          fi
+        fi
+      fi
+    else
+      resp=$(herdr agent start "$herdr_name" --kind "$kind" --pane "$pane" --timeout "$START_TIMEOUT_MS" -- \
+        "${native_args[@]}" 2>&1)
+      rc=$?
+    fi
     set -e
     if [[ $rc -eq 0 ]] && ! grep -q '"error"' <<<"$resp"; then
       set +e

@@ -217,15 +217,21 @@ def looks_like_cursor_cli_help(text: str) -> bool:
 
 
 def which_cursor_cli() -> str | None:
-    """Resolve cursor-cli. Prefer the unambiguous binary.
+    """Resolve cursor-cli. Prefer the 37890 proxy binary.
+
+    ``cursor-agent-proxy`` is our wrapper (injects 127.0.0.1:37890). Official
+    auto-update overwrites ``cursor-agent`` / ``agent`` on PATH, so those names
+    are fallbacks only.
 
     Bare ``agent`` is also Grok Build (``~/.grok/bin/agent``) on some PATHs.
     Only accept ``agent`` when ``--help`` looks like cursor-cli.
     """
-    for cand in ("cursor-agent", "agent"):
+    for cand in ("cursor-agent-proxy", "cursor-agent", "agent"):
         path = shutil.which(cand)
         if not path:
             continue
+        if cand == "cursor-agent-proxy":
+            return cand
         hay, _err = load_cmd_output([path, "--help"], timeout=15.0)
         if hay is not None and looks_like_cursor_cli_help(hay):
             return cand
@@ -282,7 +288,7 @@ def preflight_specs(
                 if hard_fail_missing_cli:
                     raise FleetError(
                         f"cursor-cli not found but fleet has {len(items)} cursor agent(s); "
-                        "install cursor-agent (do not use Grok's `agent`), drop cursor entries, "
+                        "install cursor-agent-proxy (do not use Grok's `agent`), drop cursor entries, "
                         "or pass --skip-model-preflight"
                     )
                 skipped.append(kind)
@@ -357,6 +363,7 @@ COLD_TITLES = frozenset(
     {
         "",
         "cursor agent",
+        "cursor-agent-proxy",
         "cursor-agent",
         "cursor",
         "cursor cli",

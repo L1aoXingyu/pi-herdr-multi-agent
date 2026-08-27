@@ -86,7 +86,7 @@ Fleet line formats:
 **Antigravity seat:** `g37flash` is herdr kind `agy` (`agy --model gemini-3.7-flash-high --dangerously-skip-permissions`). Needs `agy` on PATH and a Google login. If `agy` is missing or `agy models` fails, launch **drops that seat** and continues the rest (GPU nodes).
 
 **Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable5`, `k3max`). Requires
-`cursor-agent` on PATH (bare `agent` only if it is cursor-cli — Grok's `agent` is rejected) and a
+`cursor-agent-proxy` on PATH (37890 wrapper; official `cursor-agent` is left for auto-update) and a
 logged-in Cursor account. Launch uses `--trust --force`
 (= UI **Run Everything**): shell/tools auto-approve unless explicitly denied. Same blast radius
 as unsupervised pi reviewers with full tools — intentional for unattended mixed fleets.
@@ -339,11 +339,9 @@ herdr agent start "$herdr_name" --kind pi --pane "$pane" --timeout 180000 -- \
   --session-dir "$OUTDIR/$short" \
   --name "$herdr_name"
 
-# cursor-cli (fleet line: name=cursor:claude-fable-5-thinking-high)
-herdr agent start "$herdr_name" --kind cursor --pane "$pane" --timeout 180000 -- \
-  --model "$model" \
-  --trust \
-  --force
+# cursor-cli via 37890 wrapper (not PATH cursor-agent — updater clobbers that name)
+herdr pane run "$pane" -- cursor-agent-proxy --model "$model" --trust --force
+# then herdr agent rename "$pane" "$herdr_name" once detection shows cursor
 ```
 
 Notes:
