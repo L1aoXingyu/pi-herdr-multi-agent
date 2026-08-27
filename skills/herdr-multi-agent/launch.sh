@@ -389,7 +389,11 @@ start_agent() {
         rc=1
         resp="cursor-agent-proxy/cursor-agent not on PATH"
       else
-        resp=$(herdr pane run "$pane" -- "$cursor_bin" "${native_args[@]}" 2>&1)
+        # herdr pane run <PANE_ID> <COMMAND>... — a bare `--` is COMMAND[0]
+        # and is typed into the shell (`zsh: command not found: --`).
+        # Unlike `herdr agent start ... -- [AGENT_ARG]...`, pane run has no
+        # option terminator; `--model`/`--trust`/`--force` are already COMMAND.
+        resp=$(herdr pane run "$pane" "$cursor_bin" "${native_args[@]}" 2>&1)
         rc=$?
         if [[ $rc -eq 0 ]]; then
           wait_name_cursor_pane "$pane" "$herdr_name" "$START_TIMEOUT_MS"
