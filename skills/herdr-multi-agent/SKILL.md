@@ -28,16 +28,16 @@ Install as a pi package: `pi install git:github.com/L1aoXingyu/pi-herdr-multi-ag
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual five below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual four below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual five models (default / daily fleet)
+### Usual four models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
-When the user does **not** specify models/names (or says "the usual five" / "the usual six" /
-"the usual seven" / "the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
+When the user does **not** specify models/names (or says "the usual four" / "the usual five" /
+"the usual six" / "the usual seven" / "the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
 
 | Name | Kind | Model |
 |---|---|---|
@@ -45,9 +45,8 @@ When the user does **not** specify models/names (or says "the usual five" / "the
 | `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
 | `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
-| `g37flash` | `agy` | `gemini-3.7-flash-high` (Antigravity CLI) |
 
-### Full six models (heavy fleet)
+### Full five models (heavy fleet)
 
 When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
@@ -55,20 +54,18 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` on top of the five.
+Adds back opencode-go `mimopro` on top of the four.
 Daily Go seat is none (`hy3` and `glm53` dropped: OpenCode Go quota exhausted). Heavy Go seat is `mimopro` only.
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
-SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`);
-Antigravity daily seat is `g37flash=agy:gemini-3.7-flash-high`.
-`oxalpha`, `hy3`, `glm53`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, and `dots3` are out of both fleets.
+SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`).
+No Antigravity seat (`g37flash` dropped).
+`oxalpha`, `hy3`, `glm53`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, and `g37flash` are out of both fleets.
 Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.
-Phrase map: **usual five = defaults** (legacy: usual six / seven / eight / nine); **heavy six = fleet.full** (legacy: usual seven / eight / nine / eleven / ten).
+Phrase map: **usual four = defaults** (legacy: usual five / six / seven / eight / nine); **heavy five = fleet.full** (legacy: usual six / seven / eight / nine / eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable5=cursor:claude-fable-5-thinking-high`)
-
-**Antigravity seat:** `g37flash` is herdr kind `agy` (`agy --model gemini-3.7-flash-high --dangerously-skip-permissions`). Needs `agy` on PATH and a Google login. If `agy` is missing or `agy models` fails, launch **drops that seat** and continues the rest (GPU nodes).
 
 **Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable5`, `k3max`). Requires `cursor-agent-proxy` on PATH
 (37890 wrapper; official `cursor-agent` is left for auto-update) and a logged-in Cursor account. Launch uses `--trust --force`
@@ -208,12 +205,11 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual five); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual four); optional --agent name=model ...
   # optional --agent gpt56sol=cursor:gpt-5.6-sol-xhigh  (mixed kind)
   # optional --agent fable5=cursor:claude-fable-5-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
-  # optional --agent g37flash=agy:gemini-3.7-flash-high
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy six / fleet.full
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy five / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --keep / --no-close  => do not auto-close after synthesis
