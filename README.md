@@ -200,6 +200,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
+- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (do not `pane run cursor-agent-proxy`)
 - Switch Fable seat to `fable51=cursor:claude-fable-5-1-thinking-high` (short name cannot contain a dot)
 - Drop `g37flash=agy:gemini-3.7-flash-high` from both fleets; daily is usual four, heavy is five
 - Drop `oxalpha=openrouter/stealth/ox-alpha:max` from both fleets (OpenRouter stealth/ox-alpha unusable)
@@ -213,6 +214,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`main`)
 
+- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (do not `pane run cursor-agent-proxy`)
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
 - Cursor default seats: `fable51=cursor:claude-fable-5-1-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs

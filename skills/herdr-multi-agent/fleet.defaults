@@ -11,7 +11,7 @@
 #
 # launch.sh runs kind-aware model preflight (unless --skip-model-preflight):
 #   pi     -> pi --list-models
-#   cursor -> cursor-agent-proxy --list-models (fallback cursor-agent / cursor-cli agent)
+#   cursor -> cursor-agent --list-models (proxy binary optional for preflight)
 # and fails fast if entries are missing.
 #
 # Format:
@@ -46,6 +46,6 @@
 
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
-# Cursor CLI via cursor-agent-proxy (37890 wrapper); --trust --force at launch
+# Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force
 fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max
