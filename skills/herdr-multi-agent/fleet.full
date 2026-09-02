@@ -18,5 +18,5 @@
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 mimopro=opencode-go/mimo-v2.5-pro:max
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
-fable5=cursor:claude-fable-5-thinking-high
+fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max

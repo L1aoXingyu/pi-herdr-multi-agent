@@ -97,7 +97,7 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 Shipped `fleet.defaults` is the **author's usual four** (daily lean profile):
 
-- anchors: Cursor `gpt-5.6-sol-xhigh` + Cursor `claude-fable-5-thinking-high`
+- anchors: Cursor `gpt-5.6-sol-xhigh` + Cursor `claude-fable-5-1-thinking-high`
 - third Cursor seat: `k3max=cursor:kimi-k3-max`
 - no daily opencode-go seat; `hy3` and `glm53` are out of both fleets (OpenCode Go quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
@@ -130,7 +130,7 @@ Mixed-kind example:
 ```bash
 bash "$SKILL_DIR/launch.sh" ... \
   --agent gpt56sol=cursor:gpt-5.6-sol-xhigh \
-  --agent fable5=cursor:claude-fable-5-thinking-high
+  --agent fable51=cursor:claude-fable-5-1-thinking-high
 ```
 
 There is no credential bundling in this package.
@@ -200,6 +200,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
+- Switch Fable seat to `fable51=cursor:claude-fable-5-1-thinking-high` (short name cannot contain a dot)
 - Drop `g37flash=agy:gemini-3.7-flash-high` from both fleets; daily is usual four, heavy is five
 - Drop `oxalpha=openrouter/stealth/ox-alpha:max` from both fleets (OpenRouter stealth/ox-alpha unusable)
 - Drop `hy3=opencode-go/hy3:max` from both fleets (OpenCode Go quota exhausted)
@@ -213,7 +214,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 ### Unreleased (`main`)
 
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
-- Cursor default seats: `fable5=cursor:claude-fable-5-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
+- Cursor default seats: `fable51=cursor:claude-fable-5-1-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
 - Dual fleet profiles: **usual four** `fleet.defaults` (daily) + **heavy five** `fleet.full`
 - No daily Go seat; heavy Go seat is `mimopro` only. No OpenRouter seat; no Antigravity seat; `oxalpha` / `hy3` / `glm53` / `glm52` / `k27code` / `dots3` / `g37flash` dropped

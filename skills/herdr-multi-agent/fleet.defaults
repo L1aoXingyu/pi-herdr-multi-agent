@@ -33,9 +33,10 @@
 #            2026-08-25 drop glm53: OpenCode Go quota exhausted
 #            2026-08-26 drop hy3: OpenCode Go quota exhausted
 #            2026-08-26 drop oxalpha: OpenRouter stealth/ox-alpha unusable
-#            2026-09-02 drop g37flash: user requested remove gemini-3.7-flash):
-#   - Keep anchors: cursor sol-xhigh + cursor fable thinking-high
-#   - Cursor seats: gpt56sol + fable5 + k3max
+#            2026-09-02 drop g37flash: user requested remove gemini-3.7-flash
+#            2026-09-02 fable51: cursor claude-fable-5-1-thinking-high replaces fable5):
+#   - Keep anchors: cursor sol-xhigh + cursor fable 5.1 thinking-high
+#   - Cursor seats: gpt56sol + fable51 + k3max
 #   - No Antigravity seat; g37flash is out of both fleets
 #   - No daily opencode-go seat; hy3 and glm53 are out of both fleets
 #   - No OpenRouter seat; oxalpha is out of both fleets
@@ -46,5 +47,5 @@
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 # Cursor CLI via cursor-agent-proxy (37890 wrapper); --trust --force at launch
-fable5=cursor:claude-fable-5-thinking-high
+fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max

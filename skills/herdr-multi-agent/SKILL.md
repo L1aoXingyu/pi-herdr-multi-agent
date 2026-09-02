@@ -58,7 +58,7 @@ When the user does **not** specify models/names (or says "the usual four" / "the
 |---|---|---|
 | `gpt56sol` | `cursor` | `gpt-5.6-sol-xhigh` (via cursor-cli `agent`/`cursor-agent`) |
 | `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
-| `fable5` | `cursor` | `claude-fable-5-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
+| `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 
 ### Full five models (heavy fleet)
@@ -80,9 +80,9 @@ Phrase map: **usual four = defaults** (legacy: usual five / six / seven / eight 
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
-- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable5=cursor:claude-fable-5-thinking-high`)
+- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`)
 
-**Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable5`, `k3max`). Requires
+**Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable51`, `k3max`). Requires
 `cursor-agent-proxy` on PATH (37890 wrapper; official `cursor-agent` is left for auto-update) and a
 logged-in Cursor account. Launch uses `--trust --force`
 (= UI **Run Everything**): shell/tools auto-approve unless explicitly denied. Same blast radius
@@ -229,7 +229,7 @@ bash "$SKILL_DIR/launch.sh" \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
   # omit --agent => fleet.defaults (usual four); optional --agent name=model ...
   # optional --agent gpt56sol=cursor:gpt-5.6-sol-xhigh  (mixed kind)
-  # optional --agent fable5=cursor:claude-fable-5-thinking-high
+  # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
   # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy five / fleet.full
   # optional --fleet-file PATH  => custom name=model list
@@ -370,11 +370,11 @@ Notes:
   "kind": "cursor",
   "start_status": "started"
 },{
-  "name": "fable5",
-  "herdr_name": "my-review-fable5",
+  "name": "fable51",
+  "herdr_name": "my-review-fable51",
   "pane_id": "w5:pY",
   "tab_id": "w5:t9",
-  "model": "claude-fable-5-thinking-high",
+  "model": "claude-fable-5-1-thinking-high",
   "kind": "cursor",
   "start_status": "started"
 }]
