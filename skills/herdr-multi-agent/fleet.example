@@ -19,10 +19,10 @@
 # Minimal 3-model example (replace with models you actually have):
 # rev-a=cursor:gpt-5.6-sol-xhigh
 # rev-b=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
-# rev-c=cursor:claude-fable-5-thinking-high
+# rev-c=cursor:claude-fable-5-1-thinking-high
 
 # Author's usual four (same as fleet.defaults):
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
-fable5=cursor:claude-fable-5-thinking-high
+fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max
