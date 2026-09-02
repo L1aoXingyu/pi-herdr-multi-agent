@@ -33,7 +33,8 @@ Spec formats:
 
 Pi models must exist in the caller's pi config; cursor models are checked via
 `agent --list-models` / `cursor-agent --list-models` when available.
-Cursor agents start with --trust --force (UI: Run Everything) for unattended fleets.
+Cursor seats: export uppercase HTTP(S)_PROXY=http://127.0.0.1:37890 in the pane,
+then `herdr agent start --kind cursor` (canonical argv is cursor-agent). --trust --force.
 Missing pi/cursor CLIs required by the fleet fail preflight hard (unless skipped).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
 --keep / --no-close => policy.auto_close=false.
@@ -157,7 +158,7 @@ fi
 LOG="$OUTDIR/launch.log"
 exec > >(tee -a "$LOG") 2>&1
 
-log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"; }
+log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >&2; }
 
 # Best-effort: if we created a tab and die before STATUS lines, leave a breadcrumb.
 on_exit() {
@@ -320,52 +321,24 @@ sys.stdout.buffer.write(b"\0".join(a.encode() for a in args) + (b"\0" if args el
 PY
 }
 
-cursor_cli_bin() {
-  python3 - <<'PY' "$SKILL_DIR"
-import sys
-sys.path.insert(0, sys.argv[1])
-import fleet_lib as fl
-print(fl.which_cursor_cli() or "")
-PY
-}
-
-wait_name_cursor_pane() {
-  local pane=$1 herdr_name=$2 timeout_ms=$3
-  python3 - <<'PY' "$pane" "$herdr_name" "$timeout_ms"
-import json, subprocess, sys, time
-pane, name, timeout_ms = sys.argv[1], sys.argv[2], int(sys.argv[3])
-deadline = time.time() + max(timeout_ms, 3000) / 1000.0
-while time.time() < deadline:
-    p = subprocess.run(["herdr", "agent", "list"], capture_output=True, text=True)
-    try:
-        data = json.loads((p.stdout or "").strip() or "{}")
-    except json.JSONDecodeError:
-        time.sleep(1)
-        continue
-    agents = (data.get("result") or {}).get("agents") or []
-    for a in agents:
-        if a.get("pane_id") != pane:
-            continue
-        agent = (a.get("agent") or "").lower()
-        if agent not in ("cursor", "cursor-agent"):
-            continue
-        cur = a.get("name") or ""
-        if cur == name:
-            print("named")
-            raise SystemExit(0)
-        target = cur or pane
-        r = subprocess.run(
-            ["herdr", "agent", "rename", target, name],
-            capture_output=True, text=True,
-        )
-        if r.returncode == 0:
-            print("renamed")
-            raise SystemExit(0)
-        print("rename-failed", (r.stderr or r.stdout or "")[:300], file=sys.stderr)
-        raise SystemExit(1)
-    time.sleep(1)
-print("timeout waiting for cursor on", pane, file=sys.stderr)
-raise SystemExit(1)
+# Cursor/Node only honors uppercase HTTP(S)_PROXY. Remotes reach Anthropic/Fable
+# via ssh -R 127.0.0.1:37890. Mac Surge is :6152 — a dead :37890 empties the catalog.
+cursor_proxy_url() {
+  if [[ -n "${CURSOR_HTTPS_PROXY:-}" ]]; then
+    printf '%s' "$CURSOR_HTTPS_PROXY"
+    return 0
+  fi
+  python3 - <<'PY'
+import socket, sys
+s = socket.socket()
+s.settimeout(0.4)
+try:
+    s.connect(("127.0.0.1", 37890))
+except OSError:
+    sys.exit(1)
+finally:
+    s.close()
+print("http://127.0.0.1:37890")
 PY
 }
 
@@ -373,7 +346,7 @@ start_agent() {
   local herdr_name=$1 pane=$2 model=$3 short=$4 kind=$5
   local i resp rc busy_retries=0 hard_fail_retries=0
   local -a native_args=()
-  local cursor_bin=""
+  local proxy_url=""
   # busy shell: up to READY_RETRIES; other errors (bad model etc.): max 2 tries
   for ((i=1; i<=READY_RETRIES; i++)); do
     herdr pane send-keys "$pane" enter 2>/dev/null || true
@@ -383,27 +356,21 @@ start_agent() {
       native_args+=("$tok")
     done < <(start_agent_args "$kind" "$model" "$short" "$herdr_name")
     set +e
+    rc=0
+    resp=""
     if [[ "$kind" == "cursor" ]]; then
-      cursor_bin=$(cursor_cli_bin)
-      if [[ -z "$cursor_bin" ]]; then
-        rc=1
-        resp="cursor-agent-proxy/cursor-agent not on PATH"
-      else
-        # herdr pane run <PANE_ID> <COMMAND>... — a bare `--` is COMMAND[0]
-        # and is typed into the shell (`zsh: command not found: --`).
-        # Unlike `herdr agent start ... -- [AGENT_ARG]...`, pane run has no
-        # option terminator; `--model`/`--trust`/`--force` are already COMMAND.
-        resp=$(herdr pane run "$pane" "$cursor_bin" "${native_args[@]}" 2>&1)
+      # herdr types canonical `cursor-agent`. tab --env does not inherit to
+      # pane split — export uppercase 37890 in this pane only when reachable.
+      proxy_url=$(cursor_proxy_url 2>/dev/null || true)
+      if [[ -n "$proxy_url" ]]; then
+        log "cursor proxy export $proxy_url herdr_name=$herdr_name pane=$pane"
+        resp=$(herdr pane run "$pane" export HTTPS_PROXY="$proxy_url" HTTP_PROXY="$proxy_url" ALL_PROXY="$proxy_url" 2>&1)
         rc=$?
-        if [[ $rc -eq 0 ]]; then
-          wait_name_cursor_pane "$pane" "$herdr_name" "$START_TIMEOUT_MS"
-          rc=$?
-          if [[ $rc -ne 0 ]]; then
-            resp="${resp}"$'\n'"wait_name_cursor_pane failed"
-          fi
-        fi
+      else
+        log "cursor proxy skip (127.0.0.1:37890 not listening) herdr_name=$herdr_name"
       fi
-    else
+    fi
+    if [[ $rc -eq 0 ]] && ! grep -q '"error"' <<<"$resp"; then
       resp=$(herdr agent start "$herdr_name" --kind "$kind" --pane "$pane" --timeout "$START_TIMEOUT_MS" -- \
         "${native_args[@]}" 2>&1)
       rc=$?
@@ -413,9 +380,9 @@ start_agent() {
       set +e
       herdr agent wait "$herdr_name" --until idle --until done --timeout 30000 >/dev/null 2>&1
       set -e
-      # Non-pi TUIs (cursor-agent etc.) need a beat after interactive_ready before
-      # composer accepts herdr agent prompt; otherwise text lands half-submitted.
-      if [[ "$kind" != "pi" ]]; then
+      # agent start already waits for interactive_ready. Extra delay on a ready
+      # cursor composer is unnecessary. Keep a short beat for other non-pi TUIs.
+      if [[ "$kind" != "pi" && "$kind" != "cursor" ]]; then
         sleep 3
       fi
       printf '%s\n' "$resp"

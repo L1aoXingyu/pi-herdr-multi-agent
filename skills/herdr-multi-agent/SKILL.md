@@ -67,8 +67,8 @@ Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`)
 
-**Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable51`, `k3max`). Requires `cursor-agent-proxy` on PATH
-(37890 wrapper; official `cursor-agent` is left for auto-update) and a logged-in Cursor account. Launch uses `--trust --force`
+**Cursor dependency / security:** default fleet includes three cursor agents (`gpt56sol`, `fable51`, `k3max`). Requires `cursor-agent` on PATH
+(herdr's canonical executable) and a logged-in Cursor account. Launch exports uppercase `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`=`http://127.0.0.1:37890` in that pane (Cursor/Node ignores lowercase `http_proxy`), then `herdr agent start --kind cursor`. Launch uses `--trust --force`
 (= UI **Run Everything**): shell/tools auto-approve unless explicitly denied. Same blast radius
 as unsupervised pi reviewers with full tools — intentional for unattended mixed fleets.
 Missing cursor CLI when the fleet lists cursor entries fails preflight hard (unless
@@ -312,17 +312,18 @@ herdr agent start "$herdr_name" --kind pi --pane "$pane" --timeout 180000 -- \
   --session-dir "$OUTDIR/$short" \
   --name "$herdr_name"
 
-# cursor-cli via 37890 wrapper (not PATH cursor-agent — updater clobbers that name)
-# pane run has no `--` terminator; a leading `--` is typed as the command.
-herdr pane run "$pane" cursor-agent-proxy --model "$model" --trust --force
-# then herdr agent rename "$pane" "$herdr_name" once detection shows cursor
+# cursor: if 127.0.0.1:37890 is listening, export uppercase proxy in this pane
+# (split does not inherit tab --env; Mac Surge is :6152 — skip a dead :37890)
+herdr pane run "$pane" export HTTPS_PROXY=http://127.0.0.1:37890 HTTP_PROXY=http://127.0.0.1:37890 ALL_PROXY=http://127.0.0.1:37890
+herdr agent start "$herdr_name" --kind cursor --pane "$pane" --timeout 180000 -- \
+  --model "$model" --trust --force
 ```
 
 Notes:
 
 - `agent start` returns only after Herdr detects the expected agent and considers it ready (default
   start timeout 30s if you omit `--timeout`; this skill uses up to 180s, CLI max 300s).
-- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`). Cursor uses `pane run` with no leading `--` (`cursor-agent-proxy --model`/`--trust`/`--force`); a bare `--` is typed into the shell.
+- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`). Do not `pane run cursor-agent-proxy` — that returns before the TUI composer exists and `herdr agent prompt` dumps into the PTY.
 - Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
   still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
 - Mixed fleets are supported: each row in `agents.json` carries its own `kind`.
