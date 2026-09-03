@@ -31,6 +31,7 @@ Spec formats:
   name=provider/model[:thinking]   # default kind=pi (or global --kind)
   name=kind:model                  # per-agent kind when KIND is a herdr agent kind
                                    # e.g. fable51=cursor:claude-fable-5-1-thinking-high
+                                   #      g38flash=cursor:gemini-3.8-flash-high
 
 Pi models must exist in the caller's pi config; cursor models are checked via
 `cursor-agent --list-models` (bare `agent` only if it is cursor-cli, not Grok).
