@@ -43,26 +43,27 @@ Grok has **no** pi `bg_run` / `bg-task`. Do not look for those tools.
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual five below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual six below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual five models (default / daily fleet)
+### Usual six models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
-When the user does **not** specify models/names (or says "the usual five" / "the usual four" /
-"the usual six" / "the usual seven" / "the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
+When the user does **not** specify models/names (or says "the usual six" / "the usual five" /
+"the usual four" / "the usual seven" / "the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
 
 | Name | Kind | Model |
 |---|---|---|
 | `gpt56sol` | `cursor` | `gpt-5.6-sol-xhigh` (via cursor-cli `agent`/`cursor-agent`) |
 | `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
+| `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 | `g38flash` | `cursor` | `gemini-3.8-flash-high` (via cursor-cli `agent`/`cursor-agent`) |
 
-### Full six models (heavy fleet)
+### Full seven models (heavy fleet)
 
 When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
@@ -70,14 +71,14 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` on top of the five.
-Daily Go seat is none (`hy3` and `glm53` dropped: OpenCode Go quota exhausted). Heavy Go seat is `mimopro` only.
+Adds back opencode-go `mimopro` on top of the six.
+Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). Heavy Go seat is `mimopro` only.
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
-SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`).
+SiliconFlow daily seats are `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`) and `glm53` (`zai-org/GLM-5.3:max`).
 No Antigravity seat (`g37flash` dropped). Cursor Gemini seat is `g38flash` (`gemini-3.8-flash-high`).
-`oxalpha`, `hy3`, `glm53`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, and `g37flash` are out of both fleets.
+`oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, and `g37flash` are out of both fleets.
 Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.
-Phrase map: **usual five = defaults** (legacy: usual four / six / seven / eight / nine); **heavy six = fleet.full** (legacy: usual six / seven / eight / nine / eleven / ten).
+Phrase map: **usual six = defaults** (legacy: usual five / four / seven / eight / nine); **heavy seven = fleet.full** (legacy: usual six / seven / eight / nine / eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
@@ -229,12 +230,13 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual five); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual six); optional --agent name=model ...
   # optional --agent gpt56sol=cursor:gpt-5.6-sol-xhigh  (mixed kind)
+  # optional --agent glm53=siliconflow/zai-org/GLM-5.3:max
   # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
   # optional --agent g38flash=cursor:gemini-3.8-flash-high
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy six / fleet.full
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy seven / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --serial-prompt  => wait for each prompt accept before the next

@@ -1,16 +1,16 @@
-# Heavy / max-diversity fleet — author's full six.
+# Heavy / max-diversity fleet — author's full seven.
 # Use when quota allows or for high-stakes reviews:
 #   bash launch.sh ... --fleet-file "$SKILL_DIR/fleet.full"
 #
-# Daily default is fleet.defaults (usual five). Same line format.
-# Add-back remaining diversity on top of the five:
+# Daily default is fleet.defaults (usual six). Same line format.
+# Add-back remaining diversity on top of the six:
 #   mimopro
-# Daily Go seat is none (hy3 and glm53 dropped: OpenCode Go quota exhausted).
+# Daily Go seat is none (hy3 and Go glm53 dropped: OpenCode Go quota exhausted).
 # Heavy Go seat is mimopro only.
 # No OpenRouter seat (oxalpha dropped: stealth/ox-alpha unusable).
 # No Antigravity seat (g37flash dropped). Cursor Gemini seat is g38flash.
-# SiliconFlow daily seat is dsv4flash (V4-Flash-0731).
-# oxalpha, hy3, glm53, glm52, k27code, dsv4pro, dsflash, dots3, and g37flash are out of both fleets.
+# SiliconFlow daily seats: dsv4flash (V4-Flash-0731) + glm53 (GLM-5.3 max).
+# oxalpha, hy3, glm52, k27code, dsv4pro, dsflash, dots3, and g37flash are out of both fleets.
 # gpt56sol is cursor-cli gpt-5.6-sol-xhigh (ChatGPT Codex sub path is dead).
 # Kimi K3 is cursor-cli only (k3max); opencode-go k3 is out of both fleets.
 # qwen38max is out unless explicitly --agent'd.
@@ -18,6 +18,7 @@
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 mimopro=opencode-go/mimo-v2.5-pro:max
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
+glm53=siliconflow/zai-org/GLM-5.3:max
 fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max
 g38flash=cursor:gemini-3.8-flash-high
