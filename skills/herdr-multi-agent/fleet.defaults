@@ -1,4 +1,4 @@
-# Default multi-model fleet for herdr-multi-agent — author's usual four (daily).
+# Default multi-model fleet for herdr-multi-agent — author's usual five (daily).
 #
 # Heavy / max-diversity list: see fleet.full (pass --fleet-file $SKILL_DIR/fleet.full).
 #
@@ -34,9 +34,10 @@
 #            2026-08-26 drop hy3: OpenCode Go quota exhausted
 #            2026-08-26 drop oxalpha: OpenRouter stealth/ox-alpha unusable
 #            2026-09-02 drop g37flash: user requested remove gemini-3.7-flash
-#            2026-09-02 fable51: cursor claude-fable-5-1-thinking-high replaces fable5):
+#            2026-09-02 fable51: cursor claude-fable-5-1-thinking-high replaces fable5
+#            2026-09-03 g38flash: cursor gemini-3.8-flash-high (Cursor catalog; not agy)):
 #   - Keep anchors: cursor sol-xhigh + cursor fable 5.1 thinking-high
-#   - Cursor seats: gpt56sol + fable51 + k3max
+#   - Cursor seats: gpt56sol + fable51 + k3max + g38flash
 #   - No Antigravity seat; g37flash is out of both fleets
 #   - No daily opencode-go seat; hy3 and glm53 are out of both fleets
 #   - No OpenRouter seat; oxalpha is out of both fleets
@@ -49,3 +50,4 @@ dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 # Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force
 fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max
+g38flash=cursor:gemini-3.8-flash-high
