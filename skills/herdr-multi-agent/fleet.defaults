@@ -1,4 +1,4 @@
-# Default multi-model fleet for herdr-multi-agent — author's usual five (daily).
+# Default multi-model fleet for herdr-multi-agent — author's usual six (daily).
 #
 # Heavy / max-diversity list: see fleet.full (pass --fleet-file $SKILL_DIR/fleet.full).
 #
@@ -35,18 +35,20 @@
 #            2026-08-26 drop oxalpha: OpenRouter stealth/ox-alpha unusable
 #            2026-09-02 drop g37flash: user requested remove gemini-3.7-flash
 #            2026-09-02 fable51: cursor claude-fable-5-1-thinking-high replaces fable5
-#            2026-09-03 g38flash: cursor gemini-3.8-flash-high (Cursor catalog; not agy)):
+#            2026-09-03 g38flash: cursor gemini-3.8-flash-high (Cursor catalog; not agy)
+#            2026-09-03 glm53: siliconflow zai-org/GLM-5.3:max (CN public id; not OpenCode Go)):
 #   - Keep anchors: cursor sol-xhigh + cursor fable 5.1 thinking-high
 #   - Cursor seats: gpt56sol + fable51 + k3max + g38flash
 #   - No Antigravity seat; g37flash is out of both fleets
-#   - No daily opencode-go seat; hy3 and glm53 are out of both fleets
+#   - No daily opencode-go seat; hy3 and Go glm53 are out of both fleets
 #   - No OpenRouter seat; oxalpha is out of both fleets
-#   - SiliconFlow daily seat is dsv4flash (V4-Flash-0731; public id DeepSeek-V4-Flash, not -0731)
-#   - oxalpha, hy3, glm53, glm52, k27code, dsv4pro, dots3, and g37flash are out of both fleets
+#   - SiliconFlow daily seats: dsv4flash (V4-Flash-0731) + glm53 (GLM-5.3 max)
+#   - oxalpha, hy3, glm52, k27code, dsv4pro, dots3, and g37flash are out of both fleets
 #   - Drop opencode-go k3 entirely; mimopro stays in fleet.full; qwen38max is out
 
 gpt56sol=cursor:gpt-5.6-sol-xhigh
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
+glm53=siliconflow/zai-org/GLM-5.3:max
 # Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force
 fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max

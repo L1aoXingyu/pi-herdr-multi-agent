@@ -35,8 +35,8 @@ pi install /absolute/path/to/pi-herdr-multi-agent
 | `launch.sh` | Create tab, split panes, serial `agent start`, prompt fanout |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual five** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **heavy six** / max diversity |
+| `fleet.defaults` | Author daily default — **usual six** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **heavy seven** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -81,16 +81,16 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual six** (daily lean profile):
 
 - anchors: Cursor `gpt-5.6-sol-xhigh` + Cursor `claude-fable-5-1-thinking-high`
 - Cursor seats: `k3max=cursor:kimi-k3-max` and `g38flash=cursor:gemini-3.8-flash-high`
-- no daily opencode-go seat; `hy3` and `glm53` are out of both fleets (OpenCode Go quota exhausted)
+- no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
-- SiliconFlow daily seat is `dsv4flash` (V4-Flash-0731); `oxalpha`, `hy3`, `glm53`, `glm52`, `k27code`, `dsv4pro`, `dots3`, and `g37flash` are out of both fleets
+- SiliconFlow daily seats: `dsv4flash` (V4-Flash-0731) + `glm53=siliconflow/zai-org/GLM-5.3:max`; `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, and `g37flash` are out of both fleets
 
-Heavy / max-diversity **six** lives in `fleet.full`:
+Heavy / max-diversity **seven** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
@@ -187,7 +187,8 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 ### Unreleased
 
 - Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (do not `pane run cursor-agent-proxy`)
-- Add `g38flash=cursor:gemini-3.8-flash-high` to both fleets; daily is usual five, heavy is six
+- Add `glm53=siliconflow/zai-org/GLM-5.3:max` to both fleets; daily is usual six, heavy is seven
+- Add `g38flash=cursor:gemini-3.8-flash-high` to both fleets; Cursor Gemini is `g38flash` (not agy)
 - Switch Fable seat to `fable51=cursor:claude-fable-5-1-thinking-high` (short name cannot contain a dot)
 - Drop `g37flash=agy:gemini-3.7-flash-high` from both fleets (Antigravity path); Cursor Gemini is `g38flash`
 - Drop `oxalpha=openrouter/stealth/ox-alpha:max` from both fleets (OpenRouter stealth/ox-alpha unusable)
@@ -196,8 +197,8 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
 - Cursor default seats: `fable51=cursor:claude-fable-5-1-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
-- Dual fleet profiles: **usual five** `fleet.defaults` (daily) + **heavy six** `fleet.full`
-- No daily Go seat; heavy Go seat is `mimopro` only. No OpenRouter seat; no Antigravity seat; `oxalpha` / `hy3` / `glm53` / `glm52` / `k27code` / `dots3` / `g37flash` dropped
+- Dual fleet profiles: **usual six** `fleet.defaults` (daily) + **heavy seven** `fleet.full`
+- No daily Go seat; heavy Go seat is `mimopro` only. No OpenRouter seat; no Antigravity seat; `oxalpha` / `hy3` / `glm52` / `k27code` / `dots3` / `g37flash` dropped
 - Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
 - Classify terminal provider/model errors (including `429` quota exhaustion) from structured Pi session records

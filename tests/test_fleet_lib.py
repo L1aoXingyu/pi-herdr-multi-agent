@@ -70,6 +70,8 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual((short, kind, model), ("g37flash", "agy", "gemini-3.7-flash-high"))
         short, kind, model = fl.parse_agent_spec("g38flash=cursor:gemini-3.8-flash-high")
         self.assertEqual((short, kind, model), ("g38flash", "cursor", "gemini-3.8-flash-high"))
+        short, kind, model = fl.parse_agent_spec("glm53=siliconflow/zai-org/GLM-5.3:max")
+        self.assertEqual((short, kind, model), ("glm53", "pi", "siliconflow/zai-org/GLM-5.3:max"))
 
 
 class MatchModelTests(unittest.TestCase):
