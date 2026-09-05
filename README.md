@@ -98,8 +98,8 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 Shipped `fleet.defaults` is the **author's usual six** (daily lean profile):
 
-- anchors: Codex `gpt-6-astra:medium` + Cursor `claude-fable-5-1-thinking-high`
-- Codex seat: `gpt6astra=codex:gpt-6-astra:medium`
+- anchors: Codex `gpt-6-astra:high` + Cursor `claude-fable-5-1-thinking-high`
+- Codex seat: `gpt6astra=codex:gpt-6-astra:high`
 - Cursor seats: `k3max=cursor:kimi-k3-max` and `g38flash=cursor:gemini-3.8-flash-high`
 - no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
@@ -133,7 +133,7 @@ Mixed-kind example:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... \
-  --agent gpt6astra=codex:gpt-6-astra:medium \
+  --agent gpt6astra=codex:gpt-6-astra:high \
   --agent fable51=cursor:claude-fable-5-1-thinking-high
 ```
 

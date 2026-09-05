@@ -72,8 +72,8 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual((short, kind, model), ("g38flash", "cursor", "gemini-3.8-flash-high"))
         short, kind, model = fl.parse_agent_spec("glm53=siliconflow/zai-org/GLM-5.3:max")
         self.assertEqual((short, kind, model), ("glm53", "pi", "siliconflow/zai-org/GLM-5.3:max"))
-        short, kind, model = fl.parse_agent_spec("gpt6astra=codex:gpt-6-astra:medium")
-        self.assertEqual((short, kind, model), ("gpt6astra", "codex", "gpt-6-astra:medium"))
+        short, kind, model = fl.parse_agent_spec("gpt6astra=codex:gpt-6-astra:high")
+        self.assertEqual((short, kind, model), ("gpt6astra", "codex", "gpt-6-astra:high"))
 
 
 class MatchModelTests(unittest.TestCase):
@@ -179,7 +179,7 @@ class StartArgsTests(unittest.TestCase):
         self.assertEqual(
             fl.start_native_args(
                 "codex",
-                "gpt-6-astra:medium",
+                "gpt-6-astra:high",
                 session_dir="/tmp/x/c",
                 herdr_name="rev-gpt6astra",
             ),
@@ -187,11 +187,12 @@ class StartArgsTests(unittest.TestCase):
                 "--model",
                 "gpt-6-astra",
                 "-c",
-                'model_reasoning_effort="medium"',
+                'model_reasoning_effort="high"',
                 "--dangerously-bypass-approvals-and-sandbox",
                 "--dangerously-bypass-hook-trust",
             ],
         )
+        self.assertEqual(fl.split_model_effort("gpt-6-astra:high"), ("gpt-6-astra", "high"))
         self.assertEqual(fl.split_model_effort("gpt-6-astra:medium"), ("gpt-6-astra", "medium"))
         self.assertEqual(fl.split_model_effort("gpt-6-astra"), ("gpt-6-astra", None))
 

@@ -32,7 +32,7 @@ Spec formats:
   name=kind:model                  # per-agent kind when KIND is a herdr agent kind
                                    # e.g. fable51=cursor:claude-fable-5-1-thinking-high
                                    #      g38flash=cursor:gemini-3.8-flash-high
-                                   #      gpt6astra=codex:gpt-6-astra:medium
+                                   #      gpt6astra=codex:gpt-6-astra:high
                                    #      glm53=siliconflow/zai-org/GLM-5.3:max
 
 Pi models must exist in the caller's pi config; cursor models are checked via

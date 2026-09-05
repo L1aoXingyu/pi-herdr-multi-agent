@@ -56,7 +56,7 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 
 | Name | Kind | Model |
 |---|---|---|
-| `gpt6astra` | `codex` | `gpt-6-astra` reasoning `medium` (official Codex CLI) |
+| `gpt6astra` | `codex` | `gpt-6-astra` reasoning `high` (official Codex CLI) |
 | `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
 | `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
@@ -93,9 +93,9 @@ as unsupervised pi reviewers with full tools — intentional for unattended mixe
 Missing cursor CLI when the fleet lists cursor entries fails preflight hard (unless
 `--skip-model-preflight`).
 
-**Codex dependency / security:** default fleet includes `gpt6astra=codex:gpt-6-astra:medium`. Requires
+**Codex dependency / security:** default fleet includes `gpt6astra=codex:gpt-6-astra:high`. Requires
 `codex` on PATH and a ChatGPT Codex login (`codex login status`). Same 37890 proxy export when
-reachable. Launch passes `--model gpt-6-astra`, `-c model_reasoning_effort="medium"`,
+reachable. Launch passes `--model gpt-6-astra`, `-c model_reasoning_effort="high"`,
 `--dangerously-bypass-approvals-and-sandbox`, and `--dangerously-bypass-hook-trust`
 (unattended; same blast radius as cursor `--force`).
 Missing Codex CLI or login fails preflight hard (unless `--skip-model-preflight`).
@@ -239,7 +239,7 @@ bash "$SKILL_DIR/launch.sh" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
   # omit --agent => fleet.defaults (usual six); optional --agent name=model ...
-  # optional --agent gpt6astra=codex:gpt-6-astra:medium  (mixed kind)
+  # optional --agent gpt6astra=codex:gpt-6-astra:high  (mixed kind)
   # optional --agent glm53=siliconflow/zai-org/GLM-5.3:max
   # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
@@ -354,9 +354,9 @@ herdr pane run "$pane" export HTTPS_PROXY=http://127.0.0.1:37890 HTTP_PROXY=http
 herdr agent start "$herdr_name" --kind cursor --pane "$pane" --timeout 180000 -- \
   --model "$model" --trust --force
 
-# codex: same 37890 export; split `gpt-6-astra:medium` into --model + -c effort
+# codex: same 37890 export; split `gpt-6-astra:high` into --model + -c effort
 herdr agent start "$herdr_name" --kind codex --pane "$pane" --timeout 180000 -- \
-  --model gpt-6-astra -c 'model_reasoning_effort="medium"' \
+  --model gpt-6-astra -c 'model_reasoning_effort="high"' \
   --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust
 ```
 
@@ -385,7 +385,7 @@ Notes:
   "herdr_name": "my-review-gpt6astra",
   "pane_id": "w5:pX",
   "tab_id": "w5:t9",
-  "model": "gpt-6-astra:medium",
+  "model": "gpt-6-astra:high",
   "kind": "codex",
   "start_status": "started"
 },{

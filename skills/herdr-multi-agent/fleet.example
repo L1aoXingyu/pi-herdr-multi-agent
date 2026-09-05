@@ -17,12 +17,12 @@
 #   fleet.full      — full seven (heavy)
 
 # Minimal 3-model example (replace with models you actually have):
-# rev-a=codex:gpt-6-astra:medium
+# rev-a=codex:gpt-6-astra:high
 # rev-b=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 # rev-c=cursor:claude-fable-5-1-thinking-high
 
 # Author's usual six (same as fleet.defaults):
-gpt6astra=codex:gpt-6-astra:medium
+gpt6astra=codex:gpt-6-astra:high
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
 fable51=cursor:claude-fable-5-1-thinking-high
