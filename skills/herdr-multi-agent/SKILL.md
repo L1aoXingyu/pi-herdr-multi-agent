@@ -94,8 +94,9 @@ Missing cursor CLI when the fleet lists cursor entries fails preflight hard (unl
 `--skip-model-preflight`).
 
 **Codex dependency / security:** default fleet includes `gpt6astra=codex:gpt-6-astra:high`. Requires
-`codex` on PATH and a ChatGPT Codex login (`codex login status`). Same 37890 proxy export when
-reachable. Launch passes `--model gpt-6-astra`, `-c model_reasoning_effort="high"`,
+`codex` on PATH and a ChatGPT Codex login (`codex login status`). Same 37890 proxy export as
+cursor: once, while the pane is still a shell (a start retry must not pane-run export — that
+pastes `export HTTPS_PROXY=…` into the TUI). Launch passes `--model gpt-6-astra`, `-c model_reasoning_effort="high"`,
 `--dangerously-bypass-approvals-and-sandbox`, and `--dangerously-bypass-hook-trust`
 (unattended; same blast radius as cursor `--force`).
 Missing Codex CLI or login fails preflight hard (unless `--skip-model-preflight`).

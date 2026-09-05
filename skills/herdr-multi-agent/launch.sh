@@ -37,11 +37,12 @@ Spec formats:
 
 Pi models must exist in the caller's pi config; cursor models are checked via
 `cursor-agent --list-models` (bare `agent` only if it is cursor-cli, not Grok).
-Cursor seats: export uppercase HTTP(S)_PROXY=http://127.0.0.1:37890 in the pane,
-then `herdr agent start --kind cursor` (canonical argv is cursor-agent). --trust --force.
-Codex seats: `--model` + `-c model_reasoning_effort=...` plus
-`--dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`.
-Remote `~/.local/bin/codex` wrapper injects 37890; do not pane-run export (retry pastes it).
+Cursor and Codex seats: if 127.0.0.1:37890 is listening, export uppercase
+HTTP(S)_PROXY/ALL_PROXY in the pane **once while it is still a shell**, then
+`herdr agent start`. Never pane-run export after the TUI is up (retry would
+paste `export …` as a prompt). Canonical argv is `cursor-agent` / `codex`.
+Cursor: --trust --force. Codex: `--model` + `-c model_reasoning_effort=...`
+plus `--dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`.
 Missing pi/cursor/codex CLIs required by the fleet fail preflight hard (unless skipped).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
 --keep / --no-close => policy.auto_close=false.
@@ -357,6 +358,7 @@ start_agent() {
   local i resp rc busy_retries=0 hard_fail_retries=0
   local -a native_args=()
   local proxy_url=""
+  local proxy_export_done=0
   # busy shell: up to READY_RETRIES; other errors (bad model etc.): max 2 tries
   for ((i=1; i<=READY_RETRIES; i++)); do
     herdr pane send-keys "$pane" enter 2>/dev/null || true
@@ -368,18 +370,25 @@ start_agent() {
     set +e
     rc=0
     resp=""
-    if [[ "$kind" == "cursor" ]]; then
-      # herdr types canonical `cursor-agent`. tab --env does not inherit to
-      # pane split — export uppercase 37890 in this pane only when reachable.
-      # Do not pane-run export for codex: a start retry pastes it into the TUI
-      # as a prompt. Remote ~/.local/bin/codex wrapper injects 37890 itself.
-      proxy_url=$(cursor_proxy_url 2>/dev/null || true)
-      if [[ -n "$proxy_url" ]]; then
-        log "cursor proxy export $proxy_url herdr_name=$herdr_name pane=$pane"
-        resp=$(herdr pane run "$pane" export HTTPS_PROXY="$proxy_url" HTTP_PROXY="$proxy_url" ALL_PROXY="$proxy_url" 2>&1)
-        rc=$?
-      else
-        log "cursor proxy skip (127.0.0.1:37890 not listening) herdr_name=$herdr_name"
+    if [[ "$kind" == "cursor" || "$kind" == "codex" ]]; then
+      # herdr types canonical `cursor-agent` / `codex`. tab --env does not
+      # inherit to pane split. Export uppercase 37890 once while this pane is
+      # still a shell. A start retry after the TUI is up must NOT pane-run
+      # export — that pastes `export HTTPS_PROXY=…` as a user prompt.
+      if [[ "$proxy_export_done" -eq 0 ]]; then
+        if herdr agent get "$herdr_name" >/dev/null 2>&1; then
+          log "$kind proxy skip (agent already in pane) herdr_name=$herdr_name"
+        else
+          proxy_url=$(cursor_proxy_url 2>/dev/null || true)
+          if [[ -n "$proxy_url" ]]; then
+            log "$kind proxy export $proxy_url herdr_name=$herdr_name pane=$pane"
+            resp=$(herdr pane run "$pane" export HTTPS_PROXY="$proxy_url" HTTP_PROXY="$proxy_url" ALL_PROXY="$proxy_url" 2>&1)
+            rc=$?
+          else
+            log "$kind proxy skip (127.0.0.1:37890 not listening) herdr_name=$herdr_name"
+          fi
+        fi
+        proxy_export_done=1
       fi
     fi
     if [[ $rc -eq 0 ]] && ! grep -q '"error"' <<<"$resp"; then
