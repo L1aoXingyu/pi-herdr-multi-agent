@@ -7,8 +7,10 @@ and unit tests cannot drift.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
+import socket
 import subprocess
 from pathlib import Path
 from typing import Iterable
@@ -225,9 +227,15 @@ def match_model(hay: str, model: str, kind: str) -> bool:
     return False
 
 
-def load_cmd_output(cmd: list[str], timeout: float = 60.0) -> tuple[str | None, str | None]:
+def load_cmd_output(
+    cmd: list[str],
+    timeout: float = 60.0,
+    env: dict[str, str] | None = None,
+) -> tuple[str | None, str | None]:
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, env=env
+        )
     except Exception as e:  # noqa: BLE001 — surface any spawn/timeout error
         return None, str(e)
     if p.returncode != 0 or not (p.stdout or "").strip():
@@ -244,22 +252,34 @@ def looks_like_cursor_cli_help(text: str) -> bool:
     return "--list-models" in low or "cursor agent" in low
 
 
-def which_cursor_cli() -> str | None:
-    """Resolve cursor-cli. Prefer the 37890 proxy binary.
+def _uppercase_37890_env() -> dict[str, str]:
+    """Same 37890 rule as launch pane-export, for parent-process --list-models."""
+    env = os.environ.copy()
+    if env.get("HTTPS_PROXY") or env.get("HTTP_PROXY") or env.get("ALL_PROXY"):
+        return env
+    s = socket.socket()
+    s.settimeout(0.4)
+    try:
+        s.connect(("127.0.0.1", 37890))
+    except OSError:
+        return env
+    finally:
+        s.close()
+    url = "http://127.0.0.1:37890"
+    env["HTTPS_PROXY"] = env["HTTP_PROXY"] = env["ALL_PROXY"] = url
+    return env
 
-    ``cursor-agent-proxy`` is our wrapper (injects 127.0.0.1:37890). Official
-    auto-update overwrites ``cursor-agent`` / ``agent`` on PATH, so those names
-    are fallbacks only.
+
+def which_cursor_cli() -> str | None:
+    """Resolve cursor-cli. Same binary herdr starts: ``cursor-agent``.
 
     Bare ``agent`` is also Grok Build (``~/.grok/bin/agent``) on some PATHs.
     Only accept ``agent`` when ``--help`` looks like cursor-cli.
     """
-    for cand in ("cursor-agent-proxy", "cursor-agent", "agent"):
+    for cand in ("cursor-agent", "agent"):
         path = shutil.which(cand)
         if not path:
             continue
-        if cand == "cursor-agent-proxy":
-            return cand
         hay, _err = load_cmd_output([path, "--help"], timeout=15.0)
         if hay is not None and looks_like_cursor_cli_help(hay):
             return cand
@@ -354,12 +374,14 @@ def preflight_specs(
                 if hard_fail_missing_cli:
                     raise FleetError(
                         f"cursor-cli not found but fleet has {len(items)} cursor agent(s); "
-                        "install cursor-agent-proxy (do not use Grok's `agent`), drop cursor entries, "
+                        "install cursor-agent (do not use Grok's `agent`), drop cursor entries, "
                         "or pass --skip-model-preflight"
                     )
                 skipped.append(kind)
                 continue
-            hay, err = load_cmd_output([bin_name, "--list-models"])
+            hay, err = load_cmd_output(
+                [bin_name, "--list-models"], env=_uppercase_37890_env()
+            )
             if hay is None:
                 if hard_fail_missing_cli:
                     raise FleetError(f"{bin_name} --list-models failed ({err})")
@@ -463,7 +485,7 @@ COLD_TITLES = frozenset(
     {
         "",
         "cursor agent",
-        "cursor-agent-proxy",
+        "cursor-agent-proxy",  # leftover titles from deleted wrapper
         "cursor-agent",
         "cursor",
         "cursor cli",

@@ -204,7 +204,8 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
-- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (do not `pane run cursor-agent-proxy`)
+- Drop `cursor-agent-proxy`: preflight and start both use canonical `cursor-agent` (37890 via pane-export / list-models env)
+- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (canonical `cursor-agent`; no `cursor-agent-proxy`)
 - Add `glm53=siliconflow/zai-org/GLM-5.3:max` to both fleets; daily is usual six, heavy is seven
 - Add `g38flash=cursor:gemini-3.8-flash-high` to both fleets; Cursor Gemini is `g38flash` (not agy)
 - Switch Fable seat to `fable51=cursor:claude-fable-5-1-thinking-high` (short name cannot contain a dot)
@@ -220,7 +221,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`main`)
 
-- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (do not `pane run cursor-agent-proxy`)
+- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (canonical `cursor-agent`; no `cursor-agent-proxy`)
 - Add `glm53=siliconflow/zai-org/GLM-5.3:max` to both fleets; daily is usual six, heavy is seven
 - Add `g38flash=cursor:gemini-3.8-flash-high` to both fleets; Cursor Gemini is `g38flash` (not agy)
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args

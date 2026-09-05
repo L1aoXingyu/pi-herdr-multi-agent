@@ -11,7 +11,7 @@
 #
 # launch.sh runs kind-aware model preflight (unless --skip-model-preflight):
 #   pi     -> pi --list-models
-#   cursor -> cursor-agent --list-models (proxy binary optional for preflight)
+#   cursor -> cursor-agent --list-models (37890 env if listening; same as pane-export)
 #   codex  -> `codex login status` + ~/.codex/models_cache.json
 # and fails fast if entries are missing.
 #

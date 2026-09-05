@@ -365,7 +365,7 @@ Notes:
 
 - `agent start` returns only after Herdr detects the expected agent and considers it ready (default
   start timeout 30s if you omit `--timeout`; this skill uses up to 180s, CLI max 300s).
-- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`; codex: `--model` + `-c model_reasoning_effort=...` + `--dangerously-bypass-approvals-and-sandbox` + `--dangerously-bypass-hook-trust`). Do not `pane run cursor-agent-proxy` — that returns before the TUI composer exists and `herdr agent prompt` dumps into the PTY.
+- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`; codex: `--model` + `-c model_reasoning_effort=...` + `--dangerously-bypass-approvals-and-sandbox` + `--dangerously-bypass-hook-trust`). Do not `pane run` the CLI — that returns before the TUI composer exists and `herdr agent prompt` dumps into the PTY. Preflight and start both use `cursor-agent`.
 - Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
   still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
 - Mixed fleets are supported: each row in `agents.json` carries its own `kind`.

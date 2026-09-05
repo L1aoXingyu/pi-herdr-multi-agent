@@ -212,6 +212,15 @@ class StartArgsTests(unittest.TestCase):
         )
 
 
+class WhichCursorCliTests(unittest.TestCase):
+    def test_preflight_does_not_use_proxy_binary(self):
+        import inspect
+
+        src = inspect.getsource(fl.which_cursor_cli)
+        self.assertNotIn("cursor-agent-proxy", src)
+        self.assertIn('"cursor-agent"', src)
+
+
 class ExpandNameTests(unittest.TestCase):
     def test_namespace(self):
         self.assertEqual(fl.expand_herdr_name("mixed-kind-rev", "fable5"), "mixed-kind-rev-fable5")
