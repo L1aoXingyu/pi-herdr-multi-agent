@@ -12,6 +12,7 @@
 # launch.sh runs kind-aware model preflight (unless --skip-model-preflight):
 #   pi     -> pi --list-models
 #   cursor -> cursor-agent --list-models (proxy binary optional for preflight)
+#   codex  -> `codex login status` + ~/.codex/models_cache.json
 # and fails fast if entries are missing.
 #
 # Format:
@@ -36,17 +37,20 @@
 #            2026-09-02 drop g37flash: user requested remove gemini-3.7-flash
 #            2026-09-02 fable51: cursor claude-fable-5-1-thinking-high replaces fable5
 #            2026-09-03 g38flash: cursor gemini-3.8-flash-high (Cursor catalog; not agy)
-#            2026-09-03 glm53: siliconflow zai-org/GLM-5.3:max (CN public id; not OpenCode Go)):
-#   - Keep anchors: cursor sol-xhigh + cursor fable 5.1 thinking-high
-#   - Cursor seats: gpt56sol + fable51 + k3max + g38flash
+#            2026-09-03 glm53: siliconflow zai-org/GLM-5.3:max (CN public id; not OpenCode Go)
+#            2026-09-05 gpt6astra: official Codex CLI gpt-6-astra:medium; drop cursor gpt56sol):
+#   - Keep anchors: Codex gpt-6-astra medium + cursor fable 5.1 thinking-high
+#   - Codex seat: gpt6astra=codex:gpt-6-astra:medium
+#   - Cursor seats: fable51 + k3max + g38flash
 #   - No Antigravity seat; g37flash is out of both fleets
 #   - No daily opencode-go seat; hy3 and Go glm53 are out of both fleets
 #   - No OpenRouter seat; oxalpha is out of both fleets
 #   - SiliconFlow daily seats: dsv4flash (V4-Flash-0731) + glm53 (GLM-5.3 max)
-#   - oxalpha, hy3, glm52, k27code, dsv4pro, dots3, and g37flash are out of both fleets
+#   - oxalpha, hy3, glm52, k27code, dsv4pro, dots3, g37flash, and gpt56sol are out of both fleets
 #   - Drop opencode-go k3 entirely; mimopro stays in fleet.full; qwen38max is out
 
-gpt56sol=cursor:gpt-5.6-sol-xhigh
+# Codex CLI via herdr agent start --kind codex; --dangerously-bypass-approvals-and-sandbox
+gpt6astra=codex:gpt-6-astra:medium
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
 # Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force

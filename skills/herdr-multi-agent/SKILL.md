@@ -6,7 +6,7 @@ description: Launch a multi-model Herdr review fleet from Grok Build, wait with 
 # /herdr-multi-agent — Multi-model Herdr fleet from Grok Build
 
 Grok-owned copy (not a symlink to the pi skill). Parent is **Grok Build**. Fleet panes are still
-whatever `herdr agent --kind` starts (default fleet: Pi + Cursor).
+whatever `herdr agent --kind` starts (default fleet: Codex + Pi + Cursor).
 
 Use this when the user wants **visible interactive panes** in Herdr for independent parallel work
 (review, investigation, design critique). Prefer this over headless `spawn_subagent` when TUI
@@ -56,7 +56,7 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 
 | Name | Kind | Model |
 |---|---|---|
-| `gpt56sol` | `cursor` | `gpt-5.6-sol-xhigh` (via cursor-cli `agent`/`cursor-agent`) |
+| `gpt6astra` | `codex` | `gpt-6-astra` reasoning `medium` (official Codex CLI) |
 | `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
 | `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
@@ -84,7 +84,7 @@ Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`)
 
-**Cursor dependency / security:** default fleet includes four cursor agents (`gpt56sol`, `fable51`, `k3max`, `g38flash`). Requires
+**Cursor dependency / security:** default fleet includes three cursor agents (`fable51`, `k3max`, `g38flash`). Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
 uppercase `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`=`http://127.0.0.1:37890` in that pane (Cursor/Node
 ignores lowercase `http_proxy`), then `herdr agent start --kind cursor`. Launch uses `--trust --force`
@@ -93,9 +93,17 @@ as unsupervised pi reviewers with full tools — intentional for unattended mixe
 Missing cursor CLI when the fleet lists cursor entries fails preflight hard (unless
 `--skip-model-preflight`).
 
+**Codex dependency / security:** default fleet includes `gpt6astra=codex:gpt-6-astra:medium`. Requires
+`codex` on PATH and a ChatGPT Codex login (`codex login status`). Same 37890 proxy export when
+reachable. Launch passes `--model gpt-6-astra`, `-c model_reasoning_effort="medium"`,
+`--dangerously-bypass-approvals-and-sandbox`, and `--dangerously-bypass-hook-trust`
+(unattended; same blast radius as cursor `--force`).
+Missing Codex CLI or login fails preflight hard (unless `--skip-model-preflight`).
+`gpt56sol` / cursor `gpt-5.6-sol-xhigh` is out of both fleets.
+
 Override names/models when the user specifies others. Keep **stable short agent names**
 that stay unique after namespacing (see Name rules). If a default name collides with a live agent,
-prefix once (e.g. `r2-gpt56sol`) rather than reusing the live name.
+prefix once (e.g. `r2-gpt6astra`) rather than reusing the live name.
 
 ## Herdr CLI semantics (absorb from official skill)
 
@@ -231,7 +239,7 @@ bash "$SKILL_DIR/launch.sh" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
   # omit --agent => fleet.defaults (usual six); optional --agent name=model ...
-  # optional --agent gpt56sol=cursor:gpt-5.6-sol-xhigh  (mixed kind)
+  # optional --agent gpt6astra=codex:gpt-6-astra:medium  (mixed kind)
   # optional --agent glm53=siliconflow/zai-org/GLM-5.3:max
   # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
@@ -345,13 +353,18 @@ herdr agent start "$herdr_name" --kind pi --pane "$pane" --timeout 180000 -- \
 herdr pane run "$pane" export HTTPS_PROXY=http://127.0.0.1:37890 HTTP_PROXY=http://127.0.0.1:37890 ALL_PROXY=http://127.0.0.1:37890
 herdr agent start "$herdr_name" --kind cursor --pane "$pane" --timeout 180000 -- \
   --model "$model" --trust --force
+
+# codex: same 37890 export; split `gpt-6-astra:medium` into --model + -c effort
+herdr agent start "$herdr_name" --kind codex --pane "$pane" --timeout 180000 -- \
+  --model gpt-6-astra -c 'model_reasoning_effort="medium"' \
+  --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust
 ```
 
 Notes:
 
 - `agent start` returns only after Herdr detects the expected agent and considers it ready (default
   start timeout 30s if you omit `--timeout`; this skill uses up to 180s, CLI max 300s).
-- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`). Do not `pane run cursor-agent-proxy` — that returns before the TUI composer exists and `herdr agent prompt` dumps into the PTY.
+- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`; codex: `--model` + `-c model_reasoning_effort=...` + `--dangerously-bypass-approvals-and-sandbox` + `--dangerously-bypass-hook-trust`). Do not `pane run cursor-agent-proxy` — that returns before the TUI composer exists and `herdr agent prompt` dumps into the PTY.
 - Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
   still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
 - Mixed fleets are supported: each row in `agents.json` carries its own `kind`.
@@ -368,12 +381,12 @@ Notes:
 
 ```json
 [{
-  "name": "gpt56sol",
-  "herdr_name": "my-review-gpt56sol",
+  "name": "gpt6astra",
+  "herdr_name": "my-review-gpt6astra",
   "pane_id": "w5:pX",
   "tab_id": "w5:t9",
-  "model": "gpt-5.6-sol-xhigh",
-  "kind": "cursor",
+  "model": "gpt-6-astra:medium",
+  "kind": "codex",
   "start_status": "started"
 },{
   "name": "fable51",

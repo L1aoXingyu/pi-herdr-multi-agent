@@ -1,8 +1,9 @@
 # pi-herdr-multi-agent (`grok` branch)
 
 This branch is the **Grok Build** parent-harness variant of the same skill.
-`main` stays the Pi package. Do not merge this branch into `main` as a silent
-replace — parent wait tools and prompt recovery differ.
+Pi `main` is frozen at tag `pi-2026-09-05`. Do not merge this branch into `main`
+as a silent replace — parent wait tools and prompt recovery differ. Further
+fleet work is this `grok` branch plus the Cursor Agent overlay.
 
 Launch N visible agent panes in one labeled Herdr tab, give them the same prompt,
 wait with a background watchdog, harvest machine-readable `VERDICT:` blocks,
@@ -16,7 +17,7 @@ Prefer `spawn_subagent` when you only need the final text.
 - [Grok Build](https://grok.com) CLI (parent orchestrator)
 - [Herdr](https://github.com/herdrdev/herdr) **≥ 0.7.5** (`herdr` on `PATH`, server running) — tested on 0.8.x
 - `python3` and `bash` on `PATH` (scripts avoid bash-4-only `mapfile` / GNU `readlink -f`)
-- Fleet pane kinds (default: Pi + Cursor) already logged in on this machine
+- Fleet pane kinds (default: Codex + Pi + Cursor) already logged in on this machine
 
 ## Install (Grok)
 
@@ -35,10 +36,10 @@ ln -sfn /absolute/path/to/pi-herdr-multi-agent-grok/skills/herdr-multi-agent \
 
 Grok discovers `SKILL.md` from `~/.grok/skills/`. Restart the session so the skill list refreshes.
 
-Pi users should stay on `main`:
+Pi parent-harness is frozen at `pi-2026-09-05` (do not keep dual-maintaining):
 
 ```bash
-pi install git:github.com/L1aoXingyu/pi-herdr-multi-agent
+git checkout pi-2026-09-05
 ```
 
 ## What you get
@@ -97,12 +98,14 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 Shipped `fleet.defaults` is the **author's usual six** (daily lean profile):
 
-- anchors: Cursor `gpt-5.6-sol-xhigh` + Cursor `claude-fable-5-1-thinking-high`
+- anchors: Codex `gpt-6-astra:medium` + Cursor `claude-fable-5-1-thinking-high`
+- Codex seat: `gpt6astra=codex:gpt-6-astra:medium`
 - Cursor seats: `k3max=cursor:kimi-k3-max` and `g38flash=cursor:gemini-3.8-flash-high`
 - no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
-- SiliconFlow daily seats: `dsv4flash` (V4-Flash-0731) + `glm53=siliconflow/zai-org/GLM-5.3:max`; `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, and `g37flash` are out of both fleets.
+- no Cursor Sol seat; `gpt56sol` is out of both fleets
+- SiliconFlow daily seats: `dsv4flash` (V4-Flash-0731) + `glm53=siliconflow/zai-org/GLM-5.3:max`; `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, and `gpt56sol` are out of both fleets.
 
 Heavy / max-diversity **seven** lives in `fleet.full`:
 
@@ -111,25 +114,26 @@ bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
 Both profiles **fail preflight** on machines without the required providers/CLIs
-(missing `pi` or `agent`/`cursor-agent` when listed is a hard error, not a silent skip).
+(missing `pi`, `codex`, or `agent`/`cursor-agent` when listed is a hard error, not a silent skip).
 For third-party use:
 
 1. Copy `skills/herdr-multi-agent/fleet.example` → your own file and edit, or
 2. Pass `--fleet-file PATH` (including shipped `fleet.full`), or
 3. Pass one or more `--agent name=provider/model[:thinking]` or `--agent name=kind:model`
 
-Discover models with `pi --list-models` and (for Cursor) `agent --list-models`.
-`launch.sh` preflights via shared `fleet_lib.py` (exact cursor id match; pi token match).
+Discover models with `pi --list-models`, `codex login status`, and (for Cursor) `agent --list-models`.
+`launch.sh` preflights via shared `fleet_lib.py` (exact cursor id match; pi token match; Codex cache).
 Override with `--skip-model-preflight` only if you know what you're doing.
 
 Cursor rows start with `--trust --force` (UI **Run Everything**) so unattended fleets do not
-block on shell allowlist prompts. Treat that as full tool autonomy.
+block on shell allowlist prompts. Codex rows pass `--dangerously-bypass-approvals-and-sandbox`
+and `--dangerously-bypass-hook-trust`. Treat both as full tool autonomy.
 
 Mixed-kind example:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... \
-  --agent gpt56sol=cursor:gpt-5.6-sol-xhigh \
+  --agent gpt6astra=codex:gpt-6-astra:medium \
   --agent fable51=cursor:claude-fable-5-1-thinking-high
 ```
 

@@ -6,9 +6,11 @@ and unit tests cannot drift.
 """
 from __future__ import annotations
 
+import json
 import re
 import shutil
 import subprocess
+from pathlib import Path
 from typing import Iterable
 
 # Herdr agent kinds (from `herdr agent`). Unknown bare prefixes are NOT kinds.
@@ -39,6 +41,21 @@ KNOWN_KINDS = frozenset(
 )
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+CODEX_REASONING_EFFORTS = frozenset(
+    {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+)
+
+
+def split_model_effort(model: str) -> tuple[str, str | None]:
+    """Split ``id:effort`` when the suffix is a known Codex reasoning level."""
+    raw = (model or "").strip()
+    if ":" not in raw:
+        return raw, None
+    base, maybe = raw.rsplit(":", 1)
+    effort = maybe.strip().lower()
+    if effort in CODEX_REASONING_EFFORTS and base.strip():
+        return base.strip(), effort
+    return raw, None
 
 
 class FleetError(ValueError):
@@ -185,6 +202,17 @@ def match_model(hay: str, model: str, kind: str) -> bool:
     if kind == "agy":
         return m.lower() in agy_model_ids(hay)
 
+    if kind == "codex":
+        mid = split_model_effort(m)[0].lower()
+        for line in hay_l.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            token = line.split(" - ", 1)[0].strip() if " - " in line else line.split()[0]
+            if token == mid:
+                return True
+        return False
+
     # Other kinds: exact line-prefix id match only (no bare substring).
     mid = m.lower()
     for line in hay_l.splitlines():
@@ -236,6 +264,44 @@ def which_cursor_cli() -> str | None:
         if hay is not None and looks_like_cursor_cli_help(hay):
             return cand
     return None
+
+
+def _codex_login_ok() -> tuple[bool, str]:
+    """True when `codex login status` reports a session (stdout or stderr)."""
+    try:
+        p = subprocess.run(
+            ["codex", "login", "status"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception as e:  # noqa: BLE001
+        return False, str(e)
+    text = ((p.stdout or "") + "\n" + (p.stderr or "")).strip()
+    first = text.splitlines()[0] if text else f"rc={p.returncode}"
+    if "logged in" in text.lower():
+        return True, first
+    return False, first
+
+
+def _codex_models_cache_hay() -> str | None:
+    """One slug per line from ``~/.codex/models_cache.json``, if present."""
+    path = Path.home() / ".codex" / "models_cache.json"
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    models = data.get("models") if isinstance(data, dict) else None
+    if not isinstance(models, list):
+        return None
+    ids: list[str] = []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        slug = item.get("slug") or item.get("id") or item.get("name")
+        if slug:
+            ids.append(str(slug))
+    return "\n".join(ids) if ids else None
 
 
 def preflight_specs(
@@ -314,6 +380,31 @@ def preflight_specs(
             for short, model in items:
                 if not match_model(hay, model, "agy"):
                     missing.append(f"{short}=agy:{model} (agy models)")
+        elif kind == "codex":
+            if not shutil.which("codex"):
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        f"codex not on PATH but fleet has {len(items)} codex agent(s); "
+                        "install Codex CLI, drop those entries, or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            ok, detail = _codex_login_ok()
+            if not ok:
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        f"codex not logged in ({detail}); run `codex login` "
+                        "or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            cache_hay = _codex_models_cache_hay()
+            if cache_hay:
+                for short, model in items:
+                    if not match_model(cache_hay, model, "codex"):
+                        missing.append(
+                            f"{short}=codex:{model} (~/.codex/models_cache.json)"
+                        )
         else:
             # No generic list-models contract for other kinds yet.
             skipped.append(kind)
@@ -331,6 +422,15 @@ def start_native_args(kind: str, model: str, *, session_dir: str, herdr_name: st
         return ["--model", model, "--trust", "--force"]
     if kind == "agy":
         return ["--model", model, "--dangerously-skip-permissions"]
+    if kind == "codex":
+        model_id, effort = split_model_effort(model)
+        args = ["--model", model_id]
+        if effort:
+            args.extend(["-c", f'model_reasoning_effort="{effort}"'])
+        # unattended: skip approval + hook-trust UIs (same blast radius as cursor --force)
+        args.append("--dangerously-bypass-approvals-and-sandbox")
+        args.append("--dangerously-bypass-hook-trust")
+        return args
     return ["--model", model]
 
 
@@ -371,6 +471,9 @@ COLD_TITLES = frozenset(
         "agy",
         "antigravity",
         "antigravity cli",
+        "codex",
+        "codex cli",
+        "codex-cli",
     }
 )
 PASTED_TEXT_RE = re.compile(r"\[\s*Pasted text #\d+", re.I)

@@ -32,13 +32,16 @@ Spec formats:
   name=kind:model                  # per-agent kind when KIND is a herdr agent kind
                                    # e.g. fable51=cursor:claude-fable-5-1-thinking-high
                                    #      g38flash=cursor:gemini-3.8-flash-high
+                                   #      gpt6astra=codex:gpt-6-astra:medium
                                    #      glm53=siliconflow/zai-org/GLM-5.3:max
 
 Pi models must exist in the caller's pi config; cursor models are checked via
 `cursor-agent --list-models` (bare `agent` only if it is cursor-cli, not Grok).
 Cursor seats: export uppercase HTTP(S)_PROXY=http://127.0.0.1:37890 in the pane,
 then `herdr agent start --kind cursor` (canonical argv is cursor-agent). --trust --force.
-Missing pi/cursor CLIs required by the fleet fail preflight hard (unless skipped).
+Codex seats: same 37890 export when listening; `--model` + `-c model_reasoning_effort=...`
+plus `--dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`.
+Missing pi/cursor/codex CLIs required by the fleet fail preflight hard (unless skipped).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
 --keep / --no-close => policy.auto_close=false.
 --force allows reusing a non-empty outdir (also clears prior results/verdicts).
@@ -255,7 +258,7 @@ PY
 
 model_preflight() {
   # Kind-aware preflight via fleet_lib:
-  #   pi/cursor missing CLI or list-models failure → hard fail (exit 3)
+  #   pi/cursor/codex missing CLI or list-models/login failure → hard fail (exit 3)
   #   unknown kinds → WARN skip
   if [[ "$SKIP_MODEL_PREFLIGHT" -eq 1 ]]; then
     log "model preflight skipped"
@@ -297,7 +300,7 @@ if not kept:
     sys.exit(3)
 (outdir / "kept_specs.txt").write_text("\n".join(kept) + "\n")
 for k in skipped:
-    if k not in ("pi", "cursor"):
+    if k not in ("pi", "cursor", "codex"):
         print(f"WARN: no model preflight for kind={k}; continuing", file=sys.stderr)
 print("model_preflight_ok", len(kept), "skipped_kinds=", ",".join(skipped) or "-")
 PY
@@ -364,16 +367,16 @@ start_agent() {
     set +e
     rc=0
     resp=""
-    if [[ "$kind" == "cursor" ]]; then
-      # herdr types canonical `cursor-agent`. tab --env does not inherit to
-      # pane split — export uppercase 37890 in this pane only when reachable.
+    if [[ "$kind" == "cursor" || "$kind" == "codex" ]]; then
+      # herdr types canonical `cursor-agent` / `codex`. tab --env does not inherit
+      # to pane split — export uppercase 37890 in this pane only when reachable.
       proxy_url=$(cursor_proxy_url 2>/dev/null || true)
       if [[ -n "$proxy_url" ]]; then
-        log "cursor proxy export $proxy_url herdr_name=$herdr_name pane=$pane"
+        log "$kind proxy export $proxy_url herdr_name=$herdr_name pane=$pane"
         resp=$(herdr pane run "$pane" export HTTPS_PROXY="$proxy_url" HTTP_PROXY="$proxy_url" ALL_PROXY="$proxy_url" 2>&1)
         rc=$?
       else
-        log "cursor proxy skip (127.0.0.1:37890 not listening) herdr_name=$herdr_name"
+        log "$kind proxy skip (127.0.0.1:37890 not listening) herdr_name=$herdr_name"
       fi
     fi
     if [[ $rc -eq 0 ]] && ! grep -q '"error"' <<<"$resp"; then
@@ -388,7 +391,7 @@ start_agent() {
       set -e
       # agent start already waits for interactive_ready. Extra enter on a ready
       # cursor composer can submit empty. Keep a short beat for other non-pi TUIs.
-      if [[ "$kind" != "pi" && "$kind" != "cursor" ]]; then
+      if [[ "$kind" != "pi" && "$kind" != "cursor" && "$kind" != "codex" ]]; then
         sleep 3
         herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
         sleep 1

@@ -11,11 +11,11 @@
 # No Antigravity seat (g37flash dropped). Cursor Gemini seat is g38flash.
 # SiliconFlow daily seats: dsv4flash (V4-Flash-0731) + glm53 (GLM-5.3 max).
 # oxalpha, hy3, glm52, k27code, dsv4pro, dsflash, dots3, and g37flash are out of both fleets.
-# gpt56sol is cursor-cli gpt-5.6-sol-xhigh (ChatGPT Codex sub path is dead).
+# gpt6astra is official Codex CLI gpt-6-astra:medium (cursor gpt-5.6-sol dropped).
 # Kimi K3 is cursor-cli only (k3max); opencode-go k3 is out of both fleets.
 # qwen38max is out unless explicitly --agent'd.
 
-gpt56sol=cursor:gpt-5.6-sol-xhigh
+gpt6astra=codex:gpt-6-astra:medium
 mimopro=opencode-go/mimo-v2.5-pro:max
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
