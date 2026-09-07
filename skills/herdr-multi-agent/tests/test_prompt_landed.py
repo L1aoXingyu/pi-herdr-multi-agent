@@ -112,6 +112,21 @@ class PaneTests(unittest.TestCase):
             )
         )
 
+    def test_nowrite_review_is_fingerprint(self):
+        prompt = (
+            "NO-WRITE REVIEW — do not edit project files, do not commit.\n"
+            "You MAY run short commands to get feedback.\n"
+        )
+        fps = fl.prompt_fingerprints(prompt)
+        self.assertTrue(any(s.upper().startswith("NO-WRITE REVIEW") for s in fps))
+        self.assertTrue(
+            fl.prompt_already_landed(
+                title="Cursor Agent",
+                pane_text=fps[0],
+                prompt_text=prompt,
+            )
+        )
+
 
 class PolicyTests(unittest.TestCase):
     def test_k3_timeline_never_repastes_once_landed(self):

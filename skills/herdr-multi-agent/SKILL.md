@@ -217,7 +217,10 @@ Official:
    (`name → herdr_name → pane_id → tab_id`) under outdir.
 4. **Watchdog keys off agent `herdr_name`**, not pane id (pane id is fallback for raw read only).
 5. **Prompt must force a machine-harvestable trailer** containing `VERDICT:` (or user override).
-6. **Read-only by default** for review/investigation prompts unless the user explicitly wants writers.
+6. **No-write by default** for review/investigation prompts unless the user explicitly wants writers.
+   Short verify is allowed (tests, compilers, small reproducers, git, grep); scratch in `/tmp`.
+   Forbidden: edit project files, commit, start servers, occupy GPUs, long jobs.
+   Six seats share one cwd — do not write it.
 7. **One review tab per run**. Do not reuse a live tab that still has working agents.
 8. **Never print secrets** from env/auth while launching.
 9. **Watchdog never closes panes/tabs.** Only the main agent closes, and only after synthesis
@@ -299,10 +302,11 @@ REQUIRED_FIXES: ...   # or N/A
 CONFIDENCE: low|medium|high
 ```
 
-For skill/code reviews, add at the top:
+For skill/code reviews, add at the top (no-write, not no-shell):
 
 ```text
-READ-ONLY REVIEW — do not edit files, do not run long jobs, do not start servers.
+NO-WRITE REVIEW — do not edit project files, do not commit, do not start servers, do not run long jobs (training, downloads, GPU, overnight builds).
+You MAY run short commands to get feedback: tests, compilers, small reproducers, git, grep. Put scratch output in /tmp. Do not write the shared project cwd.
 ```
 
 Do **not** ask every agent to write a verdict file up front; that is a recovery path only.
@@ -526,6 +530,7 @@ Write `$OUTDIR/cleanup.json` after attempting close:
 - Leaving successful default review tabs open indefinitely (UI clutter)
 - Closing unrelated tabs/panes while cleaning up
 - Implementing review findings before user asks
+- Treating no-write review as no-shell (short tests/compilers/repros are allowed)
 - Using herdr multi-TUI when the user only needs headless text (use `spawn_subagent` instead)
 - Treating `unknown` as success
 - Keeping the watchdog alive after every agent is terminal just because a verdict is missing (suppresses the background-command completion wake)

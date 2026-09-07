@@ -500,7 +500,9 @@ COLD_TITLES = frozenset(
 )
 PASTED_TEXT_RE = re.compile(r"\[\s*Pasted text #\d+", re.I)
 PASTED_TEXT_BARE_RE = re.compile(r"\bPasted text #\d+", re.I)
-PROMPT_HEAD_RE = re.compile(r"^(ROLE|ONLY|FORBIDDEN|READ-ONLY REVIEW)\b", re.I)
+PROMPT_HEAD_RE = re.compile(
+    r"^(ROLE|ONLY|FORBIDDEN|READ-ONLY REVIEW|NO-WRITE REVIEW)\b", re.I
+)
 NONPI_MAX_TICKS = 30
 
 
@@ -518,7 +520,7 @@ def title_left_cold(title: str | None) -> bool:
 def prompt_fingerprints(prompt_text: str | None) -> list[str]:
     """Distinctive lines that mean *this* fleet prompt landed.
 
-    Prefer ROLE/ONLY/FORBIDDEN/READ-ONLY heads. Do not use VERDICT: — that
+    Prefer ROLE/ONLY/FORBIDDEN/READ-ONLY/NO-WRITE heads. Do not use VERDICT: — that
     string lives in the template and in the agent's reply.
     """
     fps: list[str] = []

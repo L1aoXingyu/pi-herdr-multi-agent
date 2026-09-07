@@ -65,7 +65,8 @@ OUTDIR=/tmp/herdr-multi-my-review
 mkdir -p "$OUTDIR"
 
 cat >"$OUTDIR/prompt.txt" <<'EOF'
-READ-ONLY REVIEW — do not edit files, do not run long jobs.
+NO-WRITE REVIEW — do not edit project files, do not commit, do not start servers, do not run long jobs (training, downloads, GPU, overnight builds).
+You MAY run short commands to get feedback: tests, compilers, small reproducers, git, grep. Put scratch output in /tmp. Do not write the shared project cwd.
 
 Review the change described below.
 ...
