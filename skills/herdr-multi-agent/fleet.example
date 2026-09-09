@@ -13,18 +13,19 @@
 #   herdr agent                  # supported kinds
 #
 # Shipped profiles (author-specific; only work if configured):
-#   fleet.defaults  — usual six (daily)
-#   fleet.full      — full seven (heavy)
+#   fleet.defaults  — usual seven (daily)
+#   fleet.full      — full eight (heavy)
 
 # Minimal 3-model example (replace with models you actually have):
 # rev-a=codex:gpt-6-astra:high
 # rev-b=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 # rev-c=cursor:claude-fable-5-1-thinking-high
 
-# Author's usual six (same as fleet.defaults):
+# Author's usual seven (same as fleet.defaults):
 gpt6astra=codex:gpt-6-astra:high
 dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
 fable51=cursor:claude-fable-5-1-thinking-high
 k3max=cursor:kimi-k3-max
 g38flash=cursor:gemini-3.8-flash-high
+musespark=cursor:muse-spark-1.3-max

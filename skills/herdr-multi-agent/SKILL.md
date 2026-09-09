@@ -43,16 +43,16 @@ Grok has **no** pi `bg_run` / `bg-task`. Do not look for those tools.
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual six below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual seven below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual six models (default / daily fleet)
+### Usual seven models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
-When the user does **not** specify models/names (or says "the usual six" / "the usual five" /
-"the usual four" / "the usual seven" / "the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
+When the user does **not** specify models/names (or says "the usual seven" / "the usual six" /
+"the usual five" / "the usual four" / "the usual nine" / "the usual eight" / "default agents" / "daily fleet"), launch exactly this fleet:
 
 | Name | Kind | Model |
 |---|---|---|
@@ -62,8 +62,9 @@ When the user does **not** specify models/names (or says "the usual six" / "the 
 | `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
 | `g38flash` | `cursor` | `gemini-3.8-flash-high` (via cursor-cli `agent`/`cursor-agent`) |
+| `musespark` | `cursor` | `muse-spark-1.3-max` (via cursor-cli `agent`/`cursor-agent`) |
 
-### Full seven models (heavy fleet)
+### Full eight models (heavy fleet)
 
 When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
 
@@ -71,20 +72,21 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` on top of the six.
+Adds back opencode-go `mimopro` on top of the seven.
 Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). Heavy Go seat is `mimopro` only.
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
 SiliconFlow daily seats are `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`) and `glm53` (`zai-org/GLM-5.3:max`).
 No Antigravity seat (`g37flash` dropped). Cursor Gemini seat is `g38flash` (`gemini-3.8-flash-high`).
+Cursor Muse Spark seat is `musespark` (`muse-spark-1.3-max`).
 `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, and `g37flash` are out of both fleets.
 Kimi K3 is cursor-cli only (`k3max`); opencode-go `k3` is out of both fleets.
-Phrase map: **usual six = defaults** (legacy: usual five / four / seven / eight / nine); **heavy seven = fleet.full** (legacy: usual six / seven / eight / nine / eleven / ten).
+Phrase map: **usual seven = defaults** (legacy: usual six / five / four / eight / nine); **heavy eight = fleet.full** (legacy: usual seven / six / eight / nine / eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`)
 
-**Cursor dependency / security:** default fleet includes three cursor agents (`fable51`, `k3max`, `g38flash`). Requires
+**Cursor dependency / security:** default fleet includes four cursor agents (`fable51`, `k3max`, `g38flash`, `musespark`). Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
 uppercase `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`=`http://127.0.0.1:37890` in that pane (Cursor/Node
 ignores lowercase `http_proxy`), then `herdr agent start --kind cursor`. Launch uses `--trust --force`
@@ -220,7 +222,7 @@ Official:
 6. **No-write by default** for review/investigation prompts unless the user explicitly wants writers.
    Short verify is allowed (tests, compilers, small reproducers, git, grep); scratch in `/tmp`.
    Forbidden: edit project files, commit, start servers, occupy GPUs, long jobs.
-   Six seats share one cwd — do not write it.
+   Seven seats share one cwd — do not write it.
 7. **One review tab per run**. Do not reuse a live tab that still has working agents.
 8. **Never print secrets** from env/auth while launching.
 9. **Watchdog never closes panes/tabs.** Only the main agent closes, and only after synthesis
@@ -242,13 +244,14 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual six); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual seven); optional --agent name=model ...
   # optional --agent gpt6astra=codex:gpt-6-astra:high  (mixed kind)
   # optional --agent glm53=siliconflow/zai-org/GLM-5.3:max
   # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
   # optional --agent k3max=cursor:kimi-k3-max
   # optional --agent g38flash=cursor:gemini-3.8-flash-high
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy seven / fleet.full
+  # optional --agent musespark=cursor:muse-spark-1.3-max
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy eight / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --serial-prompt  => wait for each prompt accept before the next

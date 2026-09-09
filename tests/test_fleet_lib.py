@@ -70,6 +70,8 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual((short, kind, model), ("g37flash", "agy", "gemini-3.7-flash-high"))
         short, kind, model = fl.parse_agent_spec("g38flash=cursor:gemini-3.8-flash-high")
         self.assertEqual((short, kind, model), ("g38flash", "cursor", "gemini-3.8-flash-high"))
+        short, kind, model = fl.parse_agent_spec("musespark=cursor:muse-spark-1.3-max")
+        self.assertEqual((short, kind, model), ("musespark", "cursor", "muse-spark-1.3-max"))
         short, kind, model = fl.parse_agent_spec("glm53=siliconflow/zai-org/GLM-5.3:max")
         self.assertEqual((short, kind, model), ("glm53", "pi", "siliconflow/zai-org/GLM-5.3:max"))
         short, kind, model = fl.parse_agent_spec("gpt6astra=codex:gpt-6-astra:high")
@@ -97,6 +99,9 @@ gpt-5.5-high - GPT-5.5 1M High
 gemini-3.8-flash-high - Gemini 3.8 Flash High
 gemini-3.8-flash-medium - Gemini 3.8 Flash Medium
 gemini-3.8-flash-low - Gemini 3.8 Flash Low
+muse-spark-1.3-max - Muse Spark 1.3 1M Max
+muse-spark-1.3-high - Muse Spark 1.3 1M
+muse-spark-1.3-medium - Muse Spark 1.3 1M Medium
 """
 
     def test_pi_matches_with_thinking_suffix(self):
@@ -115,8 +120,11 @@ gemini-3.8-flash-low - Gemini 3.8 Flash Low
         self.assertTrue(fl.match_model(self.CURSOR_HAY, "claude-fable-5-high", "cursor"))
         self.assertTrue(fl.match_model(self.CURSOR_HAY, "kimi-k3-max", "cursor"))
         self.assertTrue(fl.match_model(self.CURSOR_HAY, "gemini-3.8-flash-high", "cursor"))
+        self.assertTrue(fl.match_model(self.CURSOR_HAY, "muse-spark-1.3-max", "cursor"))
         self.assertFalse(fl.match_model(self.CURSOR_HAY, "kimi-k3", "cursor"))
         self.assertFalse(fl.match_model(self.CURSOR_HAY, "gemini-3.8-flash", "cursor"))
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "muse-spark-1.3", "cursor"))
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "muse-spark", "cursor"))
         # substring / prefix must not match a different id
         self.assertFalse(
             fl.match_model(self.CURSOR_HAY, "claude-fable-5-thinking", "cursor")
