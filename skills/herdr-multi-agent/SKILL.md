@@ -57,7 +57,7 @@ When the user does **not** specify models/names (or says "the usual seven" / "th
 | Name | Kind | Model |
 |---|---|---|
 | `gpt6astra` | `codex` | `gpt-6-astra` reasoning `high` (official Codex CLI) |
-| `dsv4flash` | `dsh` | official `deepseek-flash` reasoning `max` (DeepSeek Harness headless; V4.1 Flash) |
+| `dsv4flash` | `dsh` | official `deepseek-flash` reasoning `max` (dsh-TUI in a Herdr pane; V4.1 Flash) |
 | `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
@@ -84,7 +84,7 @@ Phrase map: **usual seven = defaults** (legacy: usual six / five / four / eight 
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
-- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`); fleet-local `dsh:deepseek-flash:max` starts DeepSeek Harness headless (not `herdr agent start --kind dsh`)
+- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`); fleet-local `dsh:deepseek-flash:max` starts `dsh --profile dsh-tui` in the pane (not `herdr agent start --kind dsh`)
 
 **Cursor dependency / security:** default fleet includes four cursor agents (`fable51`, `k3max`, `g38flash`, `musespark`). Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
@@ -106,10 +106,11 @@ Missing Codex CLI or login fails preflight hard (unless `--skip-model-preflight`
 
 **DeepSeek Harness (`dsh`) dependency:** default fleet includes
 `dsv4flash=dsh:deepseek-flash:max`. Requires `dsh` 0.1.5+ on PATH (official
-`deepseek-flash` = V4.1 Flash) and `DEEPSEEK_API_KEY` in `~/.dsh/.credentials.yaml`
-or the environment. Herdr 0.9 has no `--kind dsh`: launch reports a custom
-agent on the pane, then pane-runs `dsh --profile headless`. Missing `dsh` or
-the official key fails preflight hard (unless `--skip-model-preflight`).
+`deepseek-flash` = V4.1 Flash), `DEEPSEEK_API_KEY` in `~/.dsh/.credentials.yaml`,
+and the TUI profile (`dsh plugin --profile dsh-tui add @deepseek-harness-tui/dsh-tui`).
+Herdr 0.9 has no `--kind dsh`: launch `pane run`s `dsh --profile dsh-tui`, then
+sends the prompt with `pane send-text` + Enter. Missing `dsh`, the TUI profile,
+or the official key fails preflight hard (unless `--skip-model-preflight`).
 
 Override names/models when the user specifies others. Keep **stable short agent names**
 that stay unique after namespacing (see Name rules). If a default name collides with a live agent,

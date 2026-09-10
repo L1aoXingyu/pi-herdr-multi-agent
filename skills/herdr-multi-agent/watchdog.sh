@@ -72,6 +72,22 @@ fi
 
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"; }
 
+dsh_pane_status() {
+  # TUI is not a herdr kind. Prompt text itself contains "VERDICT:" — only count
+  # a trailer after the last assistant marker (⏺).
+  local pane=$1
+  herdr pane read "$pane" --source recent-unwrapped --lines 120 2>/dev/null | python3 -c '
+import sys
+blob = sys.stdin.read()
+if "⏺" in blob and "VERDICT:" in blob.split("⏺")[-1]:
+    print("done")
+elif "dsh-TUI" in blob or "deepseek-flash" in blob or "❯" in blob:
+    print("working")
+else:
+    print("missing")
+'
+}
+
 agent_status() {
   local herdr_name=$1 payload
   if ! payload=$(herdr agent list 2>/dev/null); then
@@ -174,7 +190,8 @@ for r in rows:
     herdr = r.get("herdr_name", name)
     pane = r.get("pane_id", "")
     st = r.get("start_status", "started")
-    print("|".join([name, herdr, pane, st]))
+    kind = r.get("kind") or "pi"
+    print("|".join([name, herdr, pane, st, kind]))
 ' "$OUTDIR/agents.json")
 
 if [[ ${#ROWS[@]} -eq 0 ]]; then
@@ -185,7 +202,7 @@ fi
 # Count startable agents
 STARTABLE=0
 for row in "${ROWS[@]}"; do
-  IFS='|' read -r short herdr_name pane start_status <<<"$row"
+  IFS='|' read -r short herdr_name pane start_status kind <<<"$row"
   if [[ "$start_status" != "failed" ]]; then
     STARTABLE=$((STARTABLE + 1))
   fi
@@ -208,13 +225,16 @@ while true; do
   status_line=""
   STATUSES=()
   for row in "${ROWS[@]}"; do
-    IFS='|' read -r short herdr_name pane start_status <<<"$row"
+    IFS='|' read -r short herdr_name pane start_status kind <<<"$row"
     if [[ "$start_status" == "failed" ]]; then
       STATUSES+=("start_failed")
       status_line+="$short=start_failed "
       continue
     fi
     st=$(agent_status "$herdr_name")
+    if [[ "$kind" == "dsh" ]]; then
+      st=$(dsh_pane_status "$pane")
+    fi
     STATUSES+=("$st")
     status_line+="$short=$st "
     if [[ "$st" == "blocked" ]]; then
@@ -233,7 +253,7 @@ while true; do
     missing_count=0
     status_idx=0
     for row in "${ROWS[@]}"; do
-      IFS='|' read -r short herdr_name pane start_status <<<"$row"
+      IFS='|' read -r short herdr_name pane start_status kind <<<"$row"
       runtime_status=${STATUSES[$status_idx]}
       status_idx=$((status_idx + 1))
       if [[ "$start_status" == "failed" ]]; then
@@ -279,10 +299,14 @@ done
 
 # Final harvest into summary
 for row in "${ROWS[@]}"; do
-  IFS='|' read -r short herdr_name pane start_status <<<"$row"
+  IFS='|' read -r short herdr_name pane start_status kind <<<"$row"
   st="start_failed"
   if [[ "$start_status" != "failed" ]]; then
-    st=$(agent_status "$herdr_name")
+    if [[ "$kind" == "dsh" ]]; then
+      st=$(dsh_pane_status "$pane")
+    else
+      st=$(agent_status "$herdr_name")
+    fi
     if [[ "$TERMINAL_HARVESTED" -ne 1 ]]; then
       harvest_agent_text "$herdr_name" "$pane" "$OUTDIR/results/${short}.pane.txt" || true
     fi

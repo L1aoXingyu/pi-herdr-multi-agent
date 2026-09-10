@@ -54,7 +54,7 @@
 
 # Codex CLI via herdr agent start --kind codex; --dangerously-bypass-approvals-and-sandbox
 gpt6astra=codex:gpt-6-astra:high
-# DeepSeek Harness headless (not herdr --kind); official API deepseek-flash = V4.1 Flash
+# dsh-TUI in a Herdr pane (not herdr --kind); official API deepseek-flash = V4.1 Flash
 dsv4flash=dsh:deepseek-flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
 # Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force

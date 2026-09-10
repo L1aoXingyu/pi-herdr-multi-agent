@@ -45,7 +45,8 @@ HTTP(S)_PROXY/ALL_PROXY in the pane **once while it is still a shell**, then
 paste `export …` as a prompt). Canonical argv is `cursor-agent` / `codex`.
 Cursor: --trust --force. Codex: `--model` + `-c model_reasoning_effort=...`
 plus `--dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`.
-Missing pi/cursor/codex CLIs required by the fleet fail preflight hard (unless skipped).
+Missing pi/cursor/codex/dsh CLIs required by the fleet fail preflight hard (unless skipped).
+dsh seats start `dsh --profile dsh-tui` in the pane (not herdr --kind, not headless).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
 --keep / --no-close => policy.auto_close=false.
 --force allows reusing a non-empty outdir (also clears prior results/verdicts).
@@ -356,59 +357,39 @@ PY
 }
 
 start_dsh_agent() {
-  # Herdr has no --kind dsh. Report a custom agent, rename it, run headless later.
+  # Herdr has no --kind dsh. Start the dsh-TUI in the pane, then report-agent.
   local herdr_name=$1 pane=$2 model=$3 short=$4
-  local home="$OUTDIR/$short/dsh-home"
-  local bin
+  local bin bindir
   bin=$(python3 - <<'PY'
 import shutil
 print(shutil.which("dsh") or "")
 PY
 )
   [[ -n "$bin" ]] || { log "dsh not on PATH"; return 1; }
-  python3 - <<'PY' "$SKILL_DIR" "$home" "$model"
-import sys
-sys.path.insert(0, sys.argv[1])
-import fleet_lib as fl
-from pathlib import Path
-fl.write_dsh_home(Path(sys.argv[2]), model=sys.argv[3])
-PY
+  bindir=$(dirname "$bin")
+  herdr pane run "$pane" export PATH="$bindir:\$PATH" >/dev/null
+  herdr pane run "$pane" "$bin" --profile dsh-tui >/dev/null
+  herdr pane wait-output "$pane" --regex 'dsh-TUI|deepseek-flash' --timeout "$START_TIMEOUT_MS" --lines 60 >/dev/null
   herdr pane report-agent "$pane" --source fleet-dsh --agent dsh --state idle --seq 1 >/dev/null
   herdr agent rename "$pane" "$herdr_name" >/dev/null
   herdr agent get "$herdr_name" >/dev/null
 }
 
 prompt_dsh_agent() {
+  # TUI has no herdr agent prompt; type into the composer and Enter.
   local herdr_name=$1 prompt_file=$2 pane=$3 model=$4 short=$5
-  local home="$OUTDIR/$short/dsh-home"
-  local script="$OUTDIR/$short/run-dsh.sh"
-  local stdout="$OUTDIR/$short/stdout.txt"
-  local stderr="$OUTDIR/$short/stderr.txt"
-  local bin
-  bin=$(python3 - <<'PY'
-import shutil
-print(shutil.which("dsh") or "")
+  [[ -n "$pane" && -f "$prompt_file" ]] || return 1
+  python3 - <<'PY' "$pane" "$prompt_file"
+import subprocess, sys
+pane, path = sys.argv[1], sys.argv[2]
+text = open(path, encoding="utf-8", errors="replace").read()
+r = subprocess.run(["herdr", "pane", "send-text", pane, text], capture_output=True, text=True)
+sys.stdout.write(r.stdout or "")
+sys.stderr.write(r.stderr or "")
+sys.exit(r.returncode)
 PY
-)
-  [[ -n "$bin" && -n "$pane" ]] || return 1
-  python3 - <<'PY' "$SKILL_DIR" "$script" "$home" "$prompt_file" "$stdout" "$stderr" "$pane" "$herdr_name" "$bin"
-import sys
-from pathlib import Path
-sys.path.insert(0, sys.argv[1])
-import fleet_lib as fl
-fl.write_dsh_runner(
-    script_path=Path(sys.argv[2]),
-    home=Path(sys.argv[3]),
-    prompt_path=Path(sys.argv[4]),
-    stdout_path=Path(sys.argv[5]),
-    stderr_path=Path(sys.argv[6]),
-    pane_id=sys.argv[7],
-    herdr_name=sys.argv[8],
-    dsh_bin=sys.argv[9],
-)
-PY
+  herdr pane send-keys "$pane" enter >/dev/null
   herdr pane report-agent "$pane" --source fleet-dsh --agent dsh --state working --seq 2 >/dev/null 2>&1 || true
-  herdr pane run "$pane" bash "$script" >/dev/null
 }
 
 start_agent() {

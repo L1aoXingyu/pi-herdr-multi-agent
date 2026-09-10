@@ -301,6 +301,21 @@ def dsh_bin() -> str | None:
     return shutil.which("dsh")
 
 
+def dsh_tui_profile_ok() -> bool:
+    """True when ~/.dsh/profiles/dsh-tui has the TUI plugin."""
+    path = Path.home() / ".dsh" / "profiles" / "dsh-tui" / "package.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    deps = data.get("dependencies") or {}
+    bundles = ((data.get("dsh") or {}).get("profile") or {}).get("bundles") or []
+    return (
+        "@deepseek-harness-tui/dsh-tui" in deps
+        or "@deepseek-harness-tui/dsh-tui" in bundles
+    )
+
+
 def dsh_credential_configured() -> bool:
     """True when official DeepSeek key is in the launch env or ~/.dsh credentials."""
     if (os.environ.get("DEEPSEEK_API_KEY") or "").strip():
@@ -539,6 +554,15 @@ def preflight_specs(
                     raise FleetError(
                         "dsh seat needs DEEPSEEK_API_KEY in the environment or "
                         "~/.dsh/.credentials.yaml; or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            if not dsh_tui_profile_ok():
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        "dsh seat needs the dsh-tui profile "
+                        "(dsh plugin --profile dsh-tui add @deepseek-harness-tui/dsh-tui); "
+                        "or pass --skip-model-preflight"
                     )
                 skipped.append(kind)
                 continue
