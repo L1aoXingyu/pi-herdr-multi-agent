@@ -34,6 +34,7 @@ Spec formats:
                                    #      g38flash=cursor:gemini-3.8-flash-high
                                    #      musespark=cursor:muse-spark-1.3-max
                                    #      gpt6astra=codex:gpt-6-astra:high
+                                   #      dsv4flash=dsh:deepseek-flash:max
                                    #      glm53=siliconflow/zai-org/GLM-5.3:max
 
 Pi models must exist in the caller's pi config; cursor models are checked via
@@ -303,7 +304,7 @@ if not kept:
     sys.exit(3)
 (outdir / "kept_specs.txt").write_text("\n".join(kept) + "\n")
 for k in skipped:
-    if k not in ("pi", "cursor", "codex"):
+    if k not in ("pi", "cursor", "codex", "dsh"):
         print(f"WARN: no model preflight for kind={k}; continuing", file=sys.stderr)
 print("model_preflight_ok", len(kept), "skipped_kinds=", ",".join(skipped) or "-")
 PY
@@ -354,6 +355,62 @@ print("http://127.0.0.1:37890")
 PY
 }
 
+start_dsh_agent() {
+  # Herdr has no --kind dsh. Report a custom agent, rename it, run headless later.
+  local herdr_name=$1 pane=$2 model=$3 short=$4
+  local home="$OUTDIR/$short/dsh-home"
+  local bin
+  bin=$(python3 - <<'PY'
+import shutil
+print(shutil.which("dsh") or "")
+PY
+)
+  [[ -n "$bin" ]] || { log "dsh not on PATH"; return 1; }
+  python3 - <<'PY' "$SKILL_DIR" "$home" "$model"
+import sys
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+from pathlib import Path
+fl.write_dsh_home(Path(sys.argv[2]), model=sys.argv[3])
+PY
+  herdr pane report-agent "$pane" --source fleet-dsh --agent dsh --state idle --seq 1 >/dev/null
+  herdr agent rename "$pane" "$herdr_name" >/dev/null
+  herdr agent get "$herdr_name" >/dev/null
+}
+
+prompt_dsh_agent() {
+  local herdr_name=$1 prompt_file=$2 pane=$3 model=$4 short=$5
+  local home="$OUTDIR/$short/dsh-home"
+  local script="$OUTDIR/$short/run-dsh.sh"
+  local stdout="$OUTDIR/$short/stdout.txt"
+  local stderr="$OUTDIR/$short/stderr.txt"
+  local bin
+  bin=$(python3 - <<'PY'
+import shutil
+print(shutil.which("dsh") or "")
+PY
+)
+  [[ -n "$bin" && -n "$pane" ]] || return 1
+  python3 - <<'PY' "$SKILL_DIR" "$script" "$home" "$prompt_file" "$stdout" "$stderr" "$pane" "$herdr_name" "$bin"
+import sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+fl.write_dsh_runner(
+    script_path=Path(sys.argv[2]),
+    home=Path(sys.argv[3]),
+    prompt_path=Path(sys.argv[4]),
+    stdout_path=Path(sys.argv[5]),
+    stderr_path=Path(sys.argv[6]),
+    pane_id=sys.argv[7],
+    herdr_name=sys.argv[8],
+    dsh_bin=sys.argv[9],
+)
+PY
+  herdr pane report-agent "$pane" --source fleet-dsh --agent dsh --state working --seq 2 >/dev/null 2>&1 || true
+  herdr pane run "$pane" bash "$script" >/dev/null
+}
+
 start_agent() {
   local herdr_name=$1 pane=$2 model=$3 short=$4 kind=$5
   local i resp rc busy_retries=0 hard_fail_retries=0
@@ -364,6 +421,22 @@ start_agent() {
   for ((i=1; i<=READY_RETRIES; i++)); do
     herdr pane send-keys "$pane" enter 2>/dev/null || true
     sleep 1
+    if [[ "$kind" == "dsh" ]]; then
+      set +e
+      start_dsh_agent "$herdr_name" "$pane" "$model" "$short"
+      rc=$?
+      set -e
+      if [[ $rc -eq 0 ]]; then
+        return 0
+      fi
+      hard_fail_retries=$((hard_fail_retries + 1))
+      log "start dsh-fail try $hard_fail_retries/2 herdr_name=$herdr_name pane=$pane"
+      if (( hard_fail_retries >= 2 )); then
+        break
+      fi
+      sleep 2
+      continue
+    fi
     native_args=()
     while IFS= read -r -d '' tok; do
       native_args+=("$tok")
@@ -462,15 +535,23 @@ build_panes() {
 }
 
 prompt_agent() {
-  # $1 herdr_name  $2 prompt_file  $3 kind (default pi)
+  # $1 herdr_name  $2 prompt_file  $3 kind (default pi)  $4 pane  $5 model  $6 short
   local herdr_name=$1
   local prompt_file=$2
   local kind=${3:-pi}
+  local pane=${4:-}
+  local model=${5:-}
+  local short=${6:-}
   local resp rc st i
   local saw_active=0
   local idle_ticks=0
   local nudged=0
   local resubmitted=0
+
+  if [[ "$kind" == "dsh" ]]; then
+    prompt_dsh_agent "$herdr_name" "$prompt_file" "$pane" "$model" "$short"
+    return $?
+  fi
 
   _submit() {
     # Use prompt file via stdin-ish: pass content; herdr CLI takes string arg.
@@ -650,13 +731,13 @@ print(fl.nonpi_prompt_policy(idle_ticks=int(sys.argv[2]), landed=sys.argv[3]=="1
 }
 
 prompt_one() {
-  # $1 short  $2 herdr_name  $3 kind
+  # $1 short  $2 herdr_name  $3 kind  $4 pane  $5 model
   # Writes $OUTDIR/$short/prompt_status.txt so parallel jobs do not clobber agents.json.
-  local short=$1 herdr_name=$2 kind=$3
+  local short=$1 herdr_name=$2 kind=$3 pane=${4:-} model=${5:-}
   local stfile="$OUTDIR/$short/prompt_status.txt"
   mkdir -p "$OUTDIR/$short"
   log "prompting $herdr_name kind=$kind"
-  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS" "$kind"; then
+  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS" "$kind" "$pane" "$model" "$short"; then
     log "prompted $herdr_name (accepted)"
     printf '%s\n' "working" >"$stfile"
     return 0
@@ -821,10 +902,10 @@ print(next(r["start_status"] for r in rows if r["name"]==sys.argv[2]))' "$OUTDIR
   fi
   PROMPT_N=$((PROMPT_N + 1))
   if [[ "$PARALLEL_PROMPT" -eq 1 ]]; then
-    prompt_one "$short" "$herdr_name" "$kind" &
+    prompt_one "$short" "$herdr_name" "$kind" "$pane" "$model" &
     PROMPT_PIDS+=($!)
   else
-    prompt_one "$short" "$herdr_name" "$kind" || FAIL=1
+    prompt_one "$short" "$herdr_name" "$kind" "$pane" "$model" || FAIL=1
   fi
 done
 if [[ "$PARALLEL_PROMPT" -eq 1 && ${#PROMPT_PIDS[@]} -gt 0 ]]; then

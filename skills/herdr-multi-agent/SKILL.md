@@ -57,7 +57,7 @@ When the user does **not** specify models/names (or says "the usual seven" / "th
 | Name | Kind | Model |
 |---|---|---|
 | `gpt6astra` | `codex` | `gpt-6-astra` reasoning `high` (official Codex CLI) |
-| `dsv4flash` | `pi` | `siliconflow/deepseek-ai/DeepSeek-V4-Flash:max` |
+| `dsv4flash` | `dsh` | official `deepseek-flash` reasoning `max` (DeepSeek Harness headless; V4.1 Flash) |
 | `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 | `k3max` | `cursor` | `kimi-k3-max` (via cursor-cli `agent`/`cursor-agent`) |
@@ -75,7 +75,7 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 Adds back opencode-go `mimopro` on top of the seven.
 Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). Heavy Go seat is `mimopro` only.
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
-SiliconFlow daily seats are `dsv4flash` (V4-Flash-0731; public id `deepseek-ai/DeepSeek-V4-Flash`) and `glm53` (`zai-org/GLM-5.3:max`).
+Daily DeepSeek seat is `dsv4flash=dsh:deepseek-flash:max` (DeepSeek Harness + official V4.1 Flash). SiliconFlow daily seat is `glm53` (`zai-org/GLM-5.3:max`).
 No Antigravity seat (`g37flash` dropped). Cursor Gemini seat is `g38flash` (`gemini-3.8-flash-high`).
 Cursor Muse Spark seat is `musespark` (`muse-spark-1.3-max`).
 `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, and `g37flash` are out of both fleets.
@@ -84,7 +84,7 @@ Phrase map: **usual seven = defaults** (legacy: usual six / five / four / eight 
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
-- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`)
+- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`); fleet-local `dsh:deepseek-flash:max` starts DeepSeek Harness headless (not `herdr agent start --kind dsh`)
 
 **Cursor dependency / security:** default fleet includes four cursor agents (`fable51`, `k3max`, `g38flash`, `musespark`). Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
@@ -103,6 +103,13 @@ pastes `export HTTPS_PROXY=…` into the TUI). Launch passes `--model gpt-6-astr
 (unattended; same blast radius as cursor `--force`).
 Missing Codex CLI or login fails preflight hard (unless `--skip-model-preflight`).
 `gpt56sol` / cursor `gpt-5.6-sol-xhigh` is out of both fleets.
+
+**DeepSeek Harness (`dsh`) dependency:** default fleet includes
+`dsv4flash=dsh:deepseek-flash:max`. Requires `dsh` 0.1.5+ on PATH (official
+`deepseek-flash` = V4.1 Flash) and `DEEPSEEK_API_KEY` in `~/.dsh/.credentials.yaml`
+or the environment. Herdr 0.9 has no `--kind dsh`: launch reports a custom
+agent on the pane, then pane-runs `dsh --profile headless`. Missing `dsh` or
+the official key fails preflight hard (unless `--skip-model-preflight`).
 
 Override names/models when the user specifies others. Keep **stable short agent names**
 that stay unique after namespacing (see Name rules). If a default name collides with a live agent,
@@ -251,6 +258,7 @@ bash "$SKILL_DIR/launch.sh" \
   # optional --agent k3max=cursor:kimi-k3-max
   # optional --agent g38flash=cursor:gemini-3.8-flash-high
   # optional --agent musespark=cursor:muse-spark-1.3-max
+  # optional --agent dsv4flash=dsh:deepseek-flash:max
   # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy eight / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight

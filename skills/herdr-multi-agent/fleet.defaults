@@ -39,20 +39,23 @@
 #            2026-09-03 g38flash: cursor gemini-3.8-flash-high (Cursor catalog; not agy)
 #            2026-09-03 glm53: siliconflow zai-org/GLM-5.3:max (CN public id; not OpenCode Go)
 #            2026-09-05 gpt6astra: official Codex CLI gpt-6-astra:high; drop cursor gpt56sol
-#            2026-09-09 musespark: cursor muse-spark-1.3-max):
+#            2026-09-09 musespark: cursor muse-spark-1.3-max
+#            2026-09-10 dsv4flash: DeepSeek Harness official deepseek-flash (V4.1); drop SiliconFlow V4-Flash):
 #   - Keep anchors: Codex gpt-6-astra high + cursor fable 5.1 thinking-high
 #   - Codex seat: gpt6astra=codex:gpt-6-astra:high
 #   - Cursor seats: fable51 + k3max + g38flash + musespark
 #   - No Antigravity seat; g37flash is out of both fleets
 #   - No daily opencode-go seat; hy3 and Go glm53 are out of both fleets
 #   - No OpenRouter seat; oxalpha is out of both fleets
-#   - SiliconFlow daily seats: dsv4flash (V4-Flash-0731) + glm53 (GLM-5.3 max)
+#   - Daily DeepSeek seat: dsv4flash = dsh official deepseek-flash:max (V4.1 Flash)
+#   - SiliconFlow daily seat: glm53 (GLM-5.3 max) only
 #   - oxalpha, hy3, glm52, k27code, dsv4pro, dots3, g37flash, and gpt56sol are out of both fleets
 #   - Drop opencode-go k3 entirely; mimopro stays in fleet.full; qwen38max is out
 
 # Codex CLI via herdr agent start --kind codex; --dangerously-bypass-approvals-and-sandbox
 gpt6astra=codex:gpt-6-astra:high
-dsv4flash=siliconflow/deepseek-ai/DeepSeek-V4-Flash:max
+# DeepSeek Harness headless (not herdr --kind); official API deepseek-flash = V4.1 Flash
+dsv4flash=dsh:deepseek-flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
 # Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force
 fable51=cursor:claude-fable-5-1-thinking-high

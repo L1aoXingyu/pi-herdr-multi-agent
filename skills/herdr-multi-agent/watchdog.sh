@@ -114,7 +114,14 @@ raise SystemExit(0 if outcome["status"] == "ok" else 1)
 
 harvest_agent_text() {
   local herdr_name=$1 pane=$2 out=$3
-  local tmp rc
+  local tmp rc short
+  short=$(basename "$out" .pane.txt)
+  # dsh headless writes the answer to stdout.txt; pane buffer is just the shell.
+  if [[ -s "$OUTDIR/$short/stdout.txt" ]]; then
+    cp "$OUTDIR/$short/stdout.txt" "$out"
+    cp "$OUTDIR/$short/stdout.txt" "$OUTDIR/results/${short}.extract.txt"
+    return 0
+  fi
   tmp=$(mktemp)
   set +e
   herdr agent read "$herdr_name" --source recent-unwrapped --lines 250 >"$tmp" 2>/dev/null

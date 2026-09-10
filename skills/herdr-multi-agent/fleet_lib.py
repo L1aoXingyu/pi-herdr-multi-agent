@@ -15,7 +15,9 @@ import subprocess
 from pathlib import Path
 from typing import Iterable
 
-# Herdr agent kinds (from `herdr agent`). Unknown bare prefixes are NOT kinds.
+# Herdr agent kinds (from `herdr agent`) plus fleet-local `dsh`.
+# `dsh` is not `herdr agent start --kind`; launch.sh pane-runs headless
+# DeepSeek Harness and reports lifecycle with `pane report-agent`.
 KNOWN_KINDS = frozenset(
     {
         "pi",
@@ -38,9 +40,14 @@ KNOWN_KINDS = frozenset(
         "hermes",
         "kilo",
         "qodercli",
+        "qwen",
         "maki",
+        "muse",
+        "dsh",
     }
 )
+# Official DeepSeek API ids this key's /models returned (2026-09-10).
+DSH_OFFICIAL_MODELS = frozenset({"deepseek-flash", "deepseek-v4-pro"})
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 CODEX_REASONING_EFFORTS = frozenset(
@@ -164,9 +171,13 @@ def cursor_model_ids(hay: str) -> set[str]:
 def match_model(hay: str, model: str, kind: str) -> bool:
     """Return True if model appears in a kind-specific --list-models dump."""
     m = (model or "").strip()
-    if not m or not hay:
+    if not m:
         return False
     kind = (kind or "pi").lower()
+    if kind == "dsh":
+        return split_model_effort(m)[0] in DSH_OFFICIAL_MODELS
+    if not hay:
+        return False
     hay_l = hay.lower()
 
     if kind == "pi":
@@ -284,6 +295,92 @@ def which_cursor_cli() -> str | None:
         if hay is not None and looks_like_cursor_cli_help(hay):
             return cand
     return None
+
+
+def dsh_bin() -> str | None:
+    return shutil.which("dsh")
+
+
+def dsh_credential_configured() -> bool:
+    """True when official DeepSeek key is in the launch env or ~/.dsh credentials."""
+    if (os.environ.get("DEEPSEEK_API_KEY") or "").strip():
+        return True
+    path = Path.home() / ".dsh" / ".credentials.yaml"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    for line in text.splitlines():
+        if line.strip().startswith("DEEPSEEK_API_KEY:"):
+            return bool(line.split(":", 1)[1].strip())
+    return False
+
+
+def write_dsh_home(home: Path, *, model: str) -> None:
+    """Isolated DSH_HOME: settings for official model + symlink to user credentials."""
+    home.mkdir(parents=True, exist_ok=True)
+    model_id, effort = split_model_effort(model)
+    effort = effort or "high"
+    settings = (
+        "# Fleet-isolated DeepSeek Harness settings. Credentials are a symlink.\n"
+        "agent-default-model:\n"
+        "  provider: deepseek-official\n"
+        f"  model: {model_id}\n"
+        f"  reasoningEffort: {effort}\n"
+    )
+    (home / "settings.yaml").write_text(settings, encoding="utf-8")
+    dest = home / ".credentials.yaml"
+    if dest.exists() or dest.is_symlink():
+        dest.unlink()
+    src = Path.home() / ".dsh" / ".credentials.yaml"
+    if src.exists():
+        dest.symlink_to(src)
+        return
+    key = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    if not key:
+        raise FleetError("dsh: no DEEPSEEK_API_KEY in env or ~/.dsh/.credentials.yaml")
+    dest.write_text(f"version: 1\n\nrefs:\n  DEEPSEEK_API_KEY: {key}\n", encoding="utf-8")
+    dest.chmod(0o600)
+
+
+def write_dsh_runner(
+    *,
+    script_path: Path,
+    home: Path,
+    prompt_path: Path,
+    stdout_path: Path,
+    stderr_path: Path,
+    pane_id: str,
+    herdr_name: str,
+    dsh_bin: str,
+) -> None:
+    """Write the pane-run script that reports working, runs headless dsh, then idle."""
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    dsh_dir = str(Path(dsh_bin).resolve().parent)
+    body = f"""#!/usr/bin/env bash
+set -u
+export PATH={json.dumps(dsh_dir)}:"$PATH"
+export DSH_HOME={json.dumps(str(home))}
+export DSH_TELEMETRY_MODE=DISABLED
+herdr pane report-agent {json.dumps(pane_id)} --source fleet-dsh --agent dsh --state working --seq 2 >/dev/null 2>&1 || true
+python3 - <<'PY'
+import pathlib, subprocess, sys
+prompt = pathlib.Path({json.dumps(str(prompt_path))}).read_text()
+out = open({json.dumps(str(stdout_path))}, "w")
+err = open({json.dumps(str(stderr_path))}, "w")
+r = subprocess.run(
+    [{json.dumps(dsh_bin)}, "--profile", "headless", prompt],
+    stdout=out,
+    stderr=err,
+)
+sys.exit(r.returncode)
+PY
+rc=$?
+herdr pane report-agent {json.dumps(pane_id)} --source fleet-dsh --agent dsh --state idle --seq 3 >/dev/null 2>&1 || true
+exit "$rc"
+"""
+    script_path.write_text(body, encoding="utf-8")
+    script_path.chmod(0o755)
 
 
 def _codex_login_ok() -> tuple[bool, str]:
@@ -427,6 +524,31 @@ def preflight_specs(
                         missing.append(
                             f"{short}=codex:{model} (~/.codex/models_cache.json)"
                         )
+        elif kind == "dsh":
+            if not dsh_bin():
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        f"dsh not on PATH but fleet has {len(items)} dsh agent(s); "
+                        "install @deepseek-ai/dsh, drop those entries, or pass "
+                        "--skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            if not dsh_credential_configured():
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        "dsh seat needs DEEPSEEK_API_KEY in the environment or "
+                        "~/.dsh/.credentials.yaml; or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            for short, model in items:
+                if not match_model("", model, "dsh"):
+                    missing.append(
+                        f"{short}=dsh:{model} (official ids: "
+                        + ", ".join(sorted(DSH_OFFICIAL_MODELS))
+                        + ")"
+                    )
         else:
             # No generic list-models contract for other kinds yet.
             skipped.append(kind)
@@ -453,6 +575,8 @@ def start_native_args(kind: str, model: str, *, session_dir: str, herdr_name: st
         args.append("--dangerously-bypass-approvals-and-sandbox")
         args.append("--dangerously-bypass-hook-trust")
         return args
+    if kind == "dsh":
+        return []
     return ["--model", model]
 
 
