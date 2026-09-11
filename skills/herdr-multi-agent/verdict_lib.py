@@ -35,6 +35,37 @@ PANE_FATAL_RE = re.compile(
 )
 
 
+_FIELD_ONLY_RE = re.compile(r"^([A-Z][A-Z0-9_]+):\s*$")
+_FIELD_LINE_RE = re.compile(r"^[A-Z][A-Z0-9_]+:\s*")
+
+
+def unwrap_pane_text(blob: str) -> str:
+    """Join TUI soft-wraps so trailer fields survive narrow panes.
+
+    Narrow Herdr/Cursor columns commonly wrap as ``VERDICT:\\nship-with-fixes``
+    or mid-token ``without-wo\\nrking``. Extractors that require a same-line
+    value then miss a real trailer.
+    """
+    if not blob:
+        return blob
+    out: list[str] = []
+    for raw in blob.splitlines():
+        stripped = raw.strip()
+        if not out:
+            if stripped:
+                out.append(stripped)
+            continue
+        prev = out[-1]
+        if not stripped:
+            out.append("")
+            continue
+        if _FIELD_ONLY_RE.match(prev) and not _FIELD_LINE_RE.match(stripped):
+            out[-1] = f"{prev} {stripped}"
+            continue
+        out.append(stripped)
+    return "\n".join(out)
+
+
 def _is_templatey(chunk: str) -> bool:
     low = chunk.lower()
     if any(h in low for h in TEMPLATE_HINTS):
@@ -53,6 +84,7 @@ def _is_templatey(chunk: str) -> bool:
 
 def extract_trailer(blob: str, marker: str = DEFAULT_MARKER) -> dict | None:
     """Return best trailer dict from blob, or None."""
+    blob = unwrap_pane_text(blob or "")
     if not blob or marker not in blob:
         return None
     idxs = [m.start() for m in re.finditer(re.escape(marker), blob)]
@@ -186,44 +218,49 @@ def _classify_error(message: str) -> str:
     return "provider_error"
 
 
-def _session_terminal_error(session_path: Path) -> tuple[bool, str | None]:
-    """Return whether a model turn exists and whether its latest turn ended in error."""
-    saw_model_turn = False
+def _session_terminal_errors(session_path: Path) -> list[str]:
+    """Return an error only when the latest recorded model turn ended in error."""
+    _saw, last_error = _session_terminal_state(session_path)
+    return [last_error] if last_error else []
+
+
+def _session_terminal_state(session_path: Path) -> tuple[bool, str | None]:
+    """Latest model-turn state: (saw_model_turn, last_error_or_None)."""
     last_error: str | None = None
+    saw_model_turn = False
     try:
-        lines = session_path.open(errors="ignore")
+        lines = session_path.read_text(errors="ignore").splitlines()
     except OSError:
         return False, None
 
-    with lines:
-        for line in lines:
-            try:
-                event = json.loads(line)
-            except Exception:
-                continue
-            if not isinstance(event, dict):
-                continue
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(event, dict):
+            continue
 
-            # Pi's common session shape is {type: "message", message: {role, ...}}.
-            message = event.get("message")
-            candidate = message if isinstance(message, dict) else event
-            role = candidate.get("role")
-            role = role.lower() if isinstance(role, str) else ""
-            if role in ("assistant", "model", "ai"):
-                saw_model_turn = True
-                error_message = candidate.get("errorMessage")
-                if isinstance(error_message, str) and error_message.strip():
-                    last_error = error_message.strip()
-                else:
-                    # A later settled assistant turn supersedes an earlier transient error.
-                    last_error = None
-                continue
+        # Pi's common session shape is {type: "message", message: {role, ...}}.
+        message = event.get("message")
+        candidate = message if isinstance(message, dict) else event
+        role = candidate.get("role")
+        role = role.lower() if isinstance(role, str) else ""
+        if role in ("assistant", "model", "ai"):
+            saw_model_turn = True
+            error_message = candidate.get("errorMessage")
+            if isinstance(error_message, str) and error_message.strip():
+                last_error = error_message.strip()
+            else:
+                # A later settled assistant turn supersedes an earlier transient error.
+                last_error = None
+            continue
 
-            # Support explicit top-level error events without scanning user prompt text.
-            if event.get("type") == "error":
-                event_message = event.get("errorMessage") or event.get("message")
-                if isinstance(event_message, str) and event_message.strip():
-                    last_error = event_message.strip()
+        # Support explicit top-level error events without scanning user prompt text.
+        if event.get("type") == "error":
+            event_message = event.get("errorMessage") or event.get("message")
+            if isinstance(event_message, str) and event_message.strip():
+                last_error = event_message.strip()
 
     return saw_model_turn, last_error
 
@@ -232,7 +269,7 @@ def agent_terminal_failure(outdir: Path, short: str) -> dict | None:
     """Return an explicit settled-turn/provider failure, if one was recorded."""
     session = latest_session(outdir / short)
     if session:
-        saw_model_turn, message = _session_terminal_error(session)
+        saw_model_turn, message = _session_terminal_state(session)
         if message:
             return {
                 "category": _classify_error(message),
@@ -242,8 +279,9 @@ def agent_terminal_failure(outdir: Path, short: str) -> dict | None:
         if saw_model_turn:
             return None
 
-    # Fallback only when no structured model turn is available. Require a strong signature so
-    # prompt text containing words such as "error" or "quota" is not misclassified.
+    # Fallback only when no structured model turn is available. Require a strong
+    # signature so prompt text containing words such as "error" or "quota" is
+    # not misclassified.
     pane = outdir / "results" / f"{short}.pane.txt"
     if pane.exists():
         blob = pane.read_text(errors="ignore")

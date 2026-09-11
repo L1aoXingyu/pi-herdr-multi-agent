@@ -6,12 +6,18 @@ and unit tests cannot drift.
 """
 from __future__ import annotations
 
+import json
+import os
 import re
 import shutil
+import socket
 import subprocess
+from pathlib import Path
 from typing import Iterable
 
-# Herdr agent kinds (from `herdr agent`). Unknown bare prefixes are NOT kinds.
+# Herdr agent kinds (from `herdr agent`) plus fleet-local `dsh`.
+# `dsh` is not `herdr agent start --kind`; launch.sh pane-runs headless
+# DeepSeek Harness and reports lifecycle with `pane report-agent`.
 KNOWN_KINDS = frozenset(
     {
         "pi",
@@ -34,11 +40,31 @@ KNOWN_KINDS = frozenset(
         "hermes",
         "kilo",
         "qodercli",
+        "qwen",
         "maki",
+        "muse",
+        "dsh",
     }
 )
+# Official DeepSeek API ids this key's /models returned (2026-09-10).
+DSH_OFFICIAL_MODELS = frozenset({"deepseek-flash", "deepseek-v4-pro"})
 
 NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
+CODEX_REASONING_EFFORTS = frozenset(
+    {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
+)
+
+
+def split_model_effort(model: str) -> tuple[str, str | None]:
+    """Split ``id:effort`` when the suffix is a known Codex reasoning level."""
+    raw = (model or "").strip()
+    if ":" not in raw:
+        return raw, None
+    base, maybe = raw.rsplit(":", 1)
+    effort = maybe.strip().lower()
+    if effort in CODEX_REASONING_EFFORTS and base.strip():
+        return base.strip(), effort
+    return raw, None
 
 
 class FleetError(ValueError):
@@ -118,6 +144,8 @@ def agy_model_ids(hay: str) -> set[str]:
         line = line.strip()
         if not line:
             continue
+        # Stop before TitleCase name or whitespace. Do not IGNORECASE — G would
+        # be eaten as part of the id.
         m = re.match(r"^([a-z0-9][a-z0-9._-]*)", line)
         if m:
             ids.add(m.group(1).lower())
@@ -143,9 +171,13 @@ def cursor_model_ids(hay: str) -> set[str]:
 def match_model(hay: str, model: str, kind: str) -> bool:
     """Return True if model appears in a kind-specific --list-models dump."""
     m = (model or "").strip()
-    if not m or not hay:
+    if not m:
         return False
     kind = (kind or "pi").lower()
+    if kind == "dsh":
+        return split_model_effort(m)[0] in DSH_OFFICIAL_MODELS
+    if not hay:
+        return False
     hay_l = hay.lower()
 
     if kind == "pi":
@@ -183,6 +215,17 @@ def match_model(hay: str, model: str, kind: str) -> bool:
     if kind == "agy":
         return m.lower() in agy_model_ids(hay)
 
+    if kind == "codex":
+        mid = split_model_effort(m)[0].lower()
+        for line in hay_l.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            token = line.split(" - ", 1)[0].strip() if " - " in line else line.split()[0]
+            if token == mid:
+                return True
+        return False
+
     # Other kinds: exact line-prefix id match only (no bare substring).
     mid = m.lower()
     for line in hay_l.splitlines():
@@ -195,9 +238,15 @@ def match_model(hay: str, model: str, kind: str) -> bool:
     return False
 
 
-def load_cmd_output(cmd: list[str], timeout: float = 60.0) -> tuple[str | None, str | None]:
+def load_cmd_output(
+    cmd: list[str],
+    timeout: float = 60.0,
+    env: dict[str, str] | None = None,
+) -> tuple[str | None, str | None]:
     try:
-        p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=timeout, env=env
+        )
     except Exception as e:  # noqa: BLE001 — surface any spawn/timeout error
         return None, str(e)
     if p.returncode != 0 or not (p.stdout or "").strip():
@@ -206,12 +255,185 @@ def load_cmd_output(cmd: list[str], timeout: float = 60.0) -> tuple[str | None, 
     return p.stdout, None
 
 
+def looks_like_cursor_cli_help(text: str) -> bool:
+    """True if --help output is cursor-cli, not Grok Build or another `agent`."""
+    low = (text or "").lower()
+    if "grok build" in low:
+        return False
+    return "--list-models" in low or "cursor agent" in low
+
+
+def _uppercase_37890_env() -> dict[str, str]:
+    """Same 37890 rule as launch pane-export, for parent-process --list-models."""
+    env = os.environ.copy()
+    if env.get("HTTPS_PROXY") or env.get("HTTP_PROXY") or env.get("ALL_PROXY"):
+        return env
+    s = socket.socket()
+    s.settimeout(0.4)
+    try:
+        s.connect(("127.0.0.1", 37890))
+    except OSError:
+        return env
+    finally:
+        s.close()
+    url = "http://127.0.0.1:37890"
+    env["HTTPS_PROXY"] = env["HTTP_PROXY"] = env["ALL_PROXY"] = url
+    return env
+
+
 def which_cursor_cli() -> str | None:
-    """Prefer cursor-agent-proxy (37890 wrapper). Official auto-update overwrites cursor-agent/agent."""
-    for cand in ("cursor-agent-proxy", "cursor-agent", "agent"):
-        if shutil.which(cand):
+    """Resolve cursor-cli. Same binary herdr starts: ``cursor-agent``.
+
+    Bare ``agent`` is also Grok Build (``~/.grok/bin/agent``) on some PATHs.
+    Only accept ``agent`` when ``--help`` looks like cursor-cli.
+    """
+    for cand in ("cursor-agent", "agent"):
+        path = shutil.which(cand)
+        if not path:
+            continue
+        hay, _err = load_cmd_output([path, "--help"], timeout=15.0)
+        if hay is not None and looks_like_cursor_cli_help(hay):
             return cand
     return None
+
+
+def dsh_bin() -> str | None:
+    return shutil.which("dsh")
+
+
+def dsh_tui_profile_ok() -> bool:
+    """True when ~/.dsh/profiles/dsh-tui has the TUI plugin."""
+    path = Path.home() / ".dsh" / "profiles" / "dsh-tui" / "package.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    deps = data.get("dependencies") or {}
+    bundles = ((data.get("dsh") or {}).get("profile") or {}).get("bundles") or []
+    return (
+        "@deepseek-harness-tui/dsh-tui" in deps
+        or "@deepseek-harness-tui/dsh-tui" in bundles
+    )
+
+
+def dsh_credential_configured() -> bool:
+    """True when official DeepSeek key is in the launch env or ~/.dsh credentials."""
+    if (os.environ.get("DEEPSEEK_API_KEY") or "").strip():
+        return True
+    path = Path.home() / ".dsh" / ".credentials.yaml"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    for line in text.splitlines():
+        if line.strip().startswith("DEEPSEEK_API_KEY:"):
+            return bool(line.split(":", 1)[1].strip())
+    return False
+
+
+def write_dsh_home(home: Path, *, model: str) -> None:
+    """Isolated DSH_HOME: settings for official model + symlink to user credentials."""
+    home.mkdir(parents=True, exist_ok=True)
+    model_id, effort = split_model_effort(model)
+    effort = effort or "high"
+    settings = (
+        "# Fleet-isolated DeepSeek Harness settings. Credentials are a symlink.\n"
+        "agent-default-model:\n"
+        "  provider: deepseek-official\n"
+        f"  model: {model_id}\n"
+        f"  reasoningEffort: {effort}\n"
+    )
+    (home / "settings.yaml").write_text(settings, encoding="utf-8")
+    dest = home / ".credentials.yaml"
+    if dest.exists() or dest.is_symlink():
+        dest.unlink()
+    src = Path.home() / ".dsh" / ".credentials.yaml"
+    if src.exists():
+        dest.symlink_to(src)
+        return
+    key = (os.environ.get("DEEPSEEK_API_KEY") or "").strip()
+    if not key:
+        raise FleetError("dsh: no DEEPSEEK_API_KEY in env or ~/.dsh/.credentials.yaml")
+    dest.write_text(f"version: 1\n\nrefs:\n  DEEPSEEK_API_KEY: {key}\n", encoding="utf-8")
+    dest.chmod(0o600)
+
+
+def write_dsh_runner(
+    *,
+    script_path: Path,
+    home: Path,
+    prompt_path: Path,
+    stdout_path: Path,
+    stderr_path: Path,
+    pane_id: str,
+    herdr_name: str,
+    dsh_bin: str,
+) -> None:
+    """Write the pane-run script that reports working, runs headless dsh, then idle."""
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+    dsh_dir = str(Path(dsh_bin).resolve().parent)
+    body = f"""#!/usr/bin/env bash
+set -u
+export PATH={json.dumps(dsh_dir)}:"$PATH"
+export DSH_HOME={json.dumps(str(home))}
+export DSH_TELEMETRY_MODE=DISABLED
+herdr pane report-agent {json.dumps(pane_id)} --source fleet-dsh --agent dsh --state working --seq 2 >/dev/null 2>&1 || true
+python3 - <<'PY'
+import pathlib, subprocess, sys
+prompt = pathlib.Path({json.dumps(str(prompt_path))}).read_text()
+out = open({json.dumps(str(stdout_path))}, "w")
+err = open({json.dumps(str(stderr_path))}, "w")
+r = subprocess.run(
+    [{json.dumps(dsh_bin)}, "--profile", "headless", prompt],
+    stdout=out,
+    stderr=err,
+)
+sys.exit(r.returncode)
+PY
+rc=$?
+herdr pane report-agent {json.dumps(pane_id)} --source fleet-dsh --agent dsh --state idle --seq 3 >/dev/null 2>&1 || true
+exit "$rc"
+"""
+    script_path.write_text(body, encoding="utf-8")
+    script_path.chmod(0o755)
+
+
+def _codex_login_ok() -> tuple[bool, str]:
+    """True when `codex login status` reports a session (stdout or stderr)."""
+    try:
+        p = subprocess.run(
+            ["codex", "login", "status"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception as e:  # noqa: BLE001
+        return False, str(e)
+    text = ((p.stdout or "") + "\n" + (p.stderr or "")).strip()
+    first = text.splitlines()[0] if text else f"rc={p.returncode}"
+    if "logged in" in text.lower():
+        return True, first
+    return False, first
+
+
+def _codex_models_cache_hay() -> str | None:
+    """One slug per line from ``~/.codex/models_cache.json``, if present."""
+    path = Path.home() / ".codex" / "models_cache.json"
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    models = data.get("models") if isinstance(data, dict) else None
+    if not isinstance(models, list):
+        return None
+    ids: list[str] = []
+    for item in models:
+        if not isinstance(item, dict):
+            continue
+        slug = item.get("slug") or item.get("id") or item.get("name")
+        if slug:
+            ids.append(str(slug))
+    return "\n".join(ids) if ids else None
 
 
 def preflight_specs(
@@ -263,12 +485,15 @@ def preflight_specs(
             if not bin_name:
                 if hard_fail_missing_cli:
                     raise FleetError(
-                        f"cursor-agent-proxy/cursor-agent not on PATH but fleet has {len(items)} cursor agent(s); "
-                        "install cursor-cli or drop cursor entries / pass --skip-model-preflight"
+                        f"cursor-cli not found but fleet has {len(items)} cursor agent(s); "
+                        "install cursor-agent (do not use Grok's `agent`), drop cursor entries, "
+                        "or pass --skip-model-preflight"
                     )
                 skipped.append(kind)
                 continue
-            hay, err = load_cmd_output([bin_name, "--list-models"])
+            hay, err = load_cmd_output(
+                [bin_name, "--list-models"], env=_uppercase_37890_env()
+            )
             if hay is None:
                 if hard_fail_missing_cli:
                     raise FleetError(f"{bin_name} --list-models failed ({err})")
@@ -289,6 +514,65 @@ def preflight_specs(
             for short, model in items:
                 if not match_model(hay, model, "agy"):
                     missing.append(f"{short}=agy:{model} (agy models)")
+        elif kind == "codex":
+            if not shutil.which("codex"):
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        f"codex not on PATH but fleet has {len(items)} codex agent(s); "
+                        "install Codex CLI, drop those entries, or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            ok, detail = _codex_login_ok()
+            if not ok:
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        f"codex not logged in ({detail}); run `codex login` "
+                        "or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            cache_hay = _codex_models_cache_hay()
+            if cache_hay:
+                for short, model in items:
+                    if not match_model(cache_hay, model, "codex"):
+                        missing.append(
+                            f"{short}=codex:{model} (~/.codex/models_cache.json)"
+                        )
+        elif kind == "dsh":
+            if not dsh_bin():
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        f"dsh not on PATH but fleet has {len(items)} dsh agent(s); "
+                        "install @deepseek-ai/dsh, drop those entries, or pass "
+                        "--skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            if not dsh_credential_configured():
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        "dsh seat needs DEEPSEEK_API_KEY in the environment or "
+                        "~/.dsh/.credentials.yaml; or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            if not dsh_tui_profile_ok():
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        "dsh seat needs the dsh-tui profile "
+                        "(dsh plugin --profile dsh-tui add @deepseek-harness-tui/dsh-tui); "
+                        "or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            for short, model in items:
+                if not match_model("", model, "dsh"):
+                    missing.append(
+                        f"{short}=dsh:{model} (official ids: "
+                        + ", ".join(sorted(DSH_OFFICIAL_MODELS))
+                        + ")"
+                    )
         else:
             # No generic list-models contract for other kinds yet.
             skipped.append(kind)
@@ -306,6 +590,17 @@ def start_native_args(kind: str, model: str, *, session_dir: str, herdr_name: st
         return ["--model", model, "--trust", "--force"]
     if kind == "agy":
         return ["--model", model, "--dangerously-skip-permissions"]
+    if kind == "codex":
+        model_id, effort = split_model_effort(model)
+        args = ["--model", model_id]
+        if effort:
+            args.extend(["-c", f'model_reasoning_effort="{effort}"'])
+        # unattended: skip approval + hook-trust UIs (same blast radius as cursor --force)
+        args.append("--dangerously-bypass-approvals-and-sandbox")
+        args.append("--dangerously-bypass-hook-trust")
+        return args
+    if kind == "dsh":
+        return []
     return ["--model", model]
 
 
@@ -326,3 +621,116 @@ def expand_herdr_name(prefix: str, short: str) -> str:
             f"(need ^[a-z][a-z0-9_-]{{0,31}}$; shorten --label/--session-prefix)"
         )
     return herdr_name
+
+
+# --- non-pi prompt landing (cursor composer) ---
+#
+# herdr `idle` after `agent prompt` does NOT mean the composer is empty.
+# Cursor often ACKs, renames the session from ROLE:, and still stays idle
+# under --no-focus. A second full paste stacks duplicate briefs.
+
+COLD_TITLES = frozenset(
+    {
+        "",
+        "cursor agent",
+        "cursor-agent-proxy",  # leftover titles from deleted wrapper
+        "cursor-agent",
+        "cursor",
+        "cursor cli",
+        "agent",
+        "agy",
+        "antigravity",
+        "antigravity cli",
+        "codex",
+        "codex cli",
+        "codex-cli",
+    }
+)
+PASTED_TEXT_RE = re.compile(r"\[\s*Pasted text #\d+", re.I)
+PASTED_TEXT_BARE_RE = re.compile(r"\bPasted text #\d+", re.I)
+PROMPT_HEAD_RE = re.compile(
+    r"^(ROLE|ONLY|FORBIDDEN|READ-ONLY REVIEW|NO-WRITE REVIEW)\b", re.I
+)
+NONPI_MAX_TICKS = 30
+
+
+def normalize_title(title: str | None) -> str:
+    t = re.sub(r"\s+", " ", (title or "").strip())
+    return t.lstrip("-–— ").strip()
+
+
+def title_left_cold(title: str | None) -> bool:
+    """True when the session title is no longer a cursor cold-start default."""
+    t = normalize_title(title).lower()
+    return bool(t) and t not in COLD_TITLES
+
+
+def prompt_fingerprints(prompt_text: str | None) -> list[str]:
+    """Distinctive lines that mean *this* fleet prompt landed.
+
+    Prefer ROLE/ONLY/FORBIDDEN/READ-ONLY/NO-WRITE heads. Do not use VERDICT: — that
+    string lives in the template and in the agent's reply.
+    """
+    fps: list[str] = []
+    for line in (prompt_text or "").splitlines():
+        s = line.strip()
+        if PROMPT_HEAD_RE.match(s) and len(s) >= 12:
+            fps.append(s)
+    if fps:
+        return fps
+    for line in (prompt_text or "").splitlines():
+        s = line.strip()
+        if len(s) >= 32 and not s.upper().startswith("VERDICT"):
+            return [s]
+    return []
+
+
+def prompt_already_landed(
+    *,
+    title: str | None = None,
+    pane_text: str | None = None,
+    prompt_text: str | None = None,
+) -> bool:
+    """True if a full re-prompt would likely stack a duplicate brief.
+
+    Any one signal is enough: title left the cold default, Cursor paste
+    marker, or a fingerprint line from the prompt file in the pane.
+    """
+    if title_left_cold(title):
+        return True
+    pane = pane_text or ""
+    if PASTED_TEXT_RE.search(pane) or PASTED_TEXT_BARE_RE.search(pane):
+        return True
+    if pane:
+        for fp in prompt_fingerprints(prompt_text):
+            if fp in pane:
+                return True
+    return False
+
+
+def nonpi_prompt_policy(
+    *,
+    idle_ticks: int,
+    landed: bool,
+    max_ticks: int = NONPI_MAX_TICKS,
+) -> str:
+    """Next action for a non-pi agent that is still not ``working``.
+
+    Returns one of: ``wait``, ``enter``, ``repaste``, ``skip_repaste``,
+    ``accept``, ``fail``.
+
+    Enter once (~6s) so a sitting composer can submit. Full re-paste only
+    when the composer still looks empty. Landed+idle after that enter is
+    success — watchdog owns the wait.
+    """
+    if idle_ticks < 1:
+        raise ValueError(f"idle_ticks must be >= 1, got {idle_ticks}")
+    if idle_ticks == 3:
+        return "enter"
+    if idle_ticks == 6:
+        return "skip_repaste" if landed else "repaste"
+    if landed and idle_ticks >= 4:
+        return "accept"
+    if idle_ticks >= max_ticks:
+        return "accept" if landed else "fail"
+    return "wait"

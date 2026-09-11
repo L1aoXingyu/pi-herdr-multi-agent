@@ -18,10 +18,11 @@ Usage: launch.sh --label NAME --cwd PATH --outdir PATH --prompt-file PATH \
   [--fleet-file PATH]
   [--workspace ID] [--session-prefix STR] [--start-timeout-ms N] [--ready-retries N]
   [--skip-model-preflight] [--kind KIND]
-  [--keep|--no-close] [--force]
+  [--serial-prompt|--parallel-prompt] [--keep|--no-close] [--force]
 
 Creates a Herdr tab, splits panes, starts agents serially with shell-ready retries,
-prompts every agent, writes mapping + policy under outdir.
+prompts every started agent (parallel fanout by default), writes mapping + policy
+under outdir. --serial-prompt waits for each prompt accept before the next.
 
 If no --agent is given, loads name=model lines from --fleet-file (default:
 $SKILL_DIR/fleet.defaults).
@@ -31,17 +32,25 @@ Spec formats:
   name=kind:model                  # per-agent kind when KIND is a herdr agent kind
                                    # e.g. fable51=cursor:claude-fable-5-1-thinking-high
                                    #      g38flash=cursor:gemini-3.8-flash-high
+                                   #      musespark=cursor:muse-spark-1.3-max
+                                   #      gpt6astra=codex:gpt-6-astra:high
+                                   #      dsv4flash=dsh:deepseek-flash:max
                                    #      glm53=siliconflow/zai-org/GLM-5.3:max
 
 Pi models must exist in the caller's pi config; cursor models are checked via
-`agent --list-models` / `cursor-agent --list-models` when available.
-Cursor seats: export uppercase HTTP(S)_PROXY=http://127.0.0.1:37890 in the pane,
-then `herdr agent start --kind cursor` (canonical argv is cursor-agent). --trust --force.
-Missing pi/cursor CLIs required by the fleet fail preflight hard (unless skipped).
+`cursor-agent --list-models` (bare `agent` only if it is cursor-cli, not Grok).
+Cursor and Codex seats: if 127.0.0.1:37890 is listening, export uppercase
+HTTP(S)_PROXY/ALL_PROXY in the pane **once while it is still a shell**, then
+`herdr agent start`. Never pane-run export after the TUI is up (retry would
+paste `export …` as a prompt). Canonical argv is `cursor-agent` / `codex`.
+Cursor: --trust --force. Codex: `--model` + `-c model_reasoning_effort=...`
+plus `--dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`.
+Missing pi/cursor/codex/dsh CLIs required by the fleet fail preflight hard (unless skipped).
+dsh seats start `dsh --profile dsh-tui` in the pane (not herdr --kind, not headless).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
 --keep / --no-close => policy.auto_close=false.
 --force allows reusing a non-empty outdir (also clears prior results/verdicts).
-Requires: bash, python3, herdr on PATH; pi/agent on PATH for kind-specific preflight.
+Requires: bash, python3, herdr on PATH; pi/cursor-agent on PATH for kind-specific preflight.
 EOF
 }
 
@@ -57,6 +66,7 @@ READY_RETRIES=12
 AUTO_CLOSE=1
 FORCE=0
 SKIP_MODEL_PREFLIGHT=0
+PARALLEL_PROMPT=1
 AGENT_KIND="pi"
 AGENTS=()
 TAB_ID=""
@@ -76,6 +86,8 @@ while [[ $# -gt 0 ]]; do
     --agent) AGENTS+=("${2:?}"); shift 2 ;;
     --kind) AGENT_KIND=${2:?}; shift 2 ;;
     --skip-model-preflight) SKIP_MODEL_PREFLIGHT=1; shift ;;
+    --serial-prompt) PARALLEL_PROMPT=0; shift ;;
+    --parallel-prompt) PARALLEL_PROMPT=1; shift ;;
     --keep|--no-close) AUTO_CLOSE=0; shift ;;
     --force) FORCE=1; shift ;;
     -h|--help) usage; exit 0 ;;
@@ -251,7 +263,7 @@ PY
 
 model_preflight() {
   # Kind-aware preflight via fleet_lib:
-  #   pi/cursor missing CLI or list-models failure → hard fail (exit 3)
+  #   pi/cursor/codex missing CLI or list-models/login failure → hard fail (exit 3)
   #   unknown kinds → WARN skip
   if [[ "$SKIP_MODEL_PREFLIGHT" -eq 1 ]]; then
     log "model preflight skipped"
@@ -293,7 +305,7 @@ if not kept:
     sys.exit(3)
 (outdir / "kept_specs.txt").write_text("\n".join(kept) + "\n")
 for k in skipped:
-    if k not in ("pi", "cursor"):
+    if k not in ("pi", "cursor", "codex", "dsh"):
         print(f"WARN: no model preflight for kind={k}; continuing", file=sys.stderr)
 print("model_preflight_ok", len(kept), "skipped_kinds=", ",".join(skipped) or "-")
 PY
@@ -344,15 +356,68 @@ print("http://127.0.0.1:37890")
 PY
 }
 
+start_dsh_agent() {
+  # Herdr has no --kind dsh. Start the dsh-TUI in the pane, then report-agent.
+  local herdr_name=$1 pane=$2 model=$3 short=$4
+  local bin bindir
+  bin=$(python3 - <<'PY'
+import shutil
+print(shutil.which("dsh") or "")
+PY
+)
+  [[ -n "$bin" ]] || { log "dsh not on PATH"; return 1; }
+  bindir=$(dirname "$bin")
+  herdr pane run "$pane" export PATH="$bindir:\$PATH" >/dev/null
+  herdr pane run "$pane" "$bin" --profile dsh-tui >/dev/null
+  herdr pane wait-output "$pane" --regex 'dsh-TUI|deepseek-flash' --timeout "$START_TIMEOUT_MS" --lines 60 >/dev/null
+  herdr pane report-agent "$pane" --source fleet-dsh --agent dsh --state idle --seq 1 >/dev/null
+  herdr agent rename "$pane" "$herdr_name" >/dev/null
+  herdr agent get "$herdr_name" >/dev/null
+}
+
+prompt_dsh_agent() {
+  # TUI has no herdr agent prompt; type into the composer and Enter.
+  local herdr_name=$1 prompt_file=$2 pane=$3 model=$4 short=$5
+  [[ -n "$pane" && -f "$prompt_file" ]] || return 1
+  python3 - <<'PY' "$pane" "$prompt_file"
+import subprocess, sys
+pane, path = sys.argv[1], sys.argv[2]
+text = open(path, encoding="utf-8", errors="replace").read()
+r = subprocess.run(["herdr", "pane", "send-text", pane, text], capture_output=True, text=True)
+sys.stdout.write(r.stdout or "")
+sys.stderr.write(r.stderr or "")
+sys.exit(r.returncode)
+PY
+  herdr pane send-keys "$pane" enter >/dev/null
+  herdr pane report-agent "$pane" --source fleet-dsh --agent dsh --state working --seq 2 >/dev/null 2>&1 || true
+}
+
 start_agent() {
   local herdr_name=$1 pane=$2 model=$3 short=$4 kind=$5
   local i resp rc busy_retries=0 hard_fail_retries=0
   local -a native_args=()
   local proxy_url=""
+  local proxy_export_done=0
   # busy shell: up to READY_RETRIES; other errors (bad model etc.): max 2 tries
   for ((i=1; i<=READY_RETRIES; i++)); do
     herdr pane send-keys "$pane" enter 2>/dev/null || true
     sleep 1
+    if [[ "$kind" == "dsh" ]]; then
+      set +e
+      start_dsh_agent "$herdr_name" "$pane" "$model" "$short"
+      rc=$?
+      set -e
+      if [[ $rc -eq 0 ]]; then
+        return 0
+      fi
+      hard_fail_retries=$((hard_fail_retries + 1))
+      log "start dsh-fail try $hard_fail_retries/2 herdr_name=$herdr_name pane=$pane"
+      if (( hard_fail_retries >= 2 )); then
+        break
+      fi
+      sleep 2
+      continue
+    fi
     native_args=()
     while IFS= read -r -d '' tok; do
       native_args+=("$tok")
@@ -360,16 +425,25 @@ start_agent() {
     set +e
     rc=0
     resp=""
-    if [[ "$kind" == "cursor" ]]; then
-      # herdr types canonical `cursor-agent`. tab --env does not inherit to
-      # pane split — export uppercase 37890 in this pane only when reachable.
-      proxy_url=$(cursor_proxy_url 2>/dev/null || true)
-      if [[ -n "$proxy_url" ]]; then
-        log "cursor proxy export $proxy_url herdr_name=$herdr_name pane=$pane"
-        resp=$(herdr pane run "$pane" export HTTPS_PROXY="$proxy_url" HTTP_PROXY="$proxy_url" ALL_PROXY="$proxy_url" 2>&1)
-        rc=$?
-      else
-        log "cursor proxy skip (127.0.0.1:37890 not listening) herdr_name=$herdr_name"
+    if [[ "$kind" == "cursor" || "$kind" == "codex" ]]; then
+      # herdr types canonical `cursor-agent` / `codex`. tab --env does not
+      # inherit to pane split. Export uppercase 37890 once while this pane is
+      # still a shell. A start retry after the TUI is up must NOT pane-run
+      # export — that pastes `export HTTPS_PROXY=…` as a user prompt.
+      if [[ "$proxy_export_done" -eq 0 ]]; then
+        if herdr agent get "$herdr_name" >/dev/null 2>&1; then
+          log "$kind proxy skip (agent already in pane) herdr_name=$herdr_name"
+        else
+          proxy_url=$(cursor_proxy_url 2>/dev/null || true)
+          if [[ -n "$proxy_url" ]]; then
+            log "$kind proxy export $proxy_url herdr_name=$herdr_name pane=$pane"
+            resp=$(herdr pane run "$pane" export HTTPS_PROXY="$proxy_url" HTTP_PROXY="$proxy_url" ALL_PROXY="$proxy_url" 2>&1)
+            rc=$?
+          else
+            log "$kind proxy skip (127.0.0.1:37890 not listening) herdr_name=$herdr_name"
+          fi
+        fi
+        proxy_export_done=1
       fi
     fi
     if [[ $rc -eq 0 ]] && ! grep -q '"error"' <<<"$resp"; then
@@ -382,10 +456,12 @@ start_agent() {
       set +e
       herdr agent wait "$herdr_name" --until idle --until done --timeout 30000 >/dev/null 2>&1
       set -e
-      # agent start already waits for interactive_ready. Extra delay on a ready
-      # cursor composer is unnecessary. Keep a short beat for other non-pi TUIs.
-      if [[ "$kind" != "pi" && "$kind" != "cursor" ]]; then
+      # agent start already waits for interactive_ready. Extra enter on a ready
+      # cursor composer can submit empty. Keep a short beat for other non-pi TUIs.
+      if [[ "$kind" != "pi" && "$kind" != "cursor" && "$kind" != "codex" ]]; then
         sleep 3
+        herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
+        sleep 1
       fi
       printf '%s\n' "$resp"
       return 0
@@ -440,14 +516,23 @@ build_panes() {
 }
 
 prompt_agent() {
-  # $1 herdr_name  $2 prompt_file  $3 kind (default pi)
+  # $1 herdr_name  $2 prompt_file  $3 kind (default pi)  $4 pane  $5 model  $6 short
   local herdr_name=$1
   local prompt_file=$2
   local kind=${3:-pi}
+  local pane=${4:-}
+  local model=${5:-}
+  local short=${6:-}
   local resp rc st i
   local saw_active=0
   local idle_ticks=0
   local nudged=0
+  local resubmitted=0
+
+  if [[ "$kind" == "dsh" ]]; then
+    prompt_dsh_agent "$herdr_name" "$prompt_file" "$pane" "$model" "$short"
+    return $?
+  fi
 
   _submit() {
     # Use prompt file via stdin-ish: pass content; herdr CLI takes string arg.
@@ -494,57 +579,172 @@ PY
 
   # Prefer observing working/done/blocked.
   # pi: accept idle quickly — never re-paste prompt (avoids double-submit on status lag).
-  # non-pi (cursor): cold composer may need enter-only nudge; still never re-paste full prompt.
-  for ((i=1; i<=20; i++)); do
-    st=$(herdr agent list 2>/dev/null | python3 -c 'import json,sys
+  # non-pi (cursor): idle ≠ empty composer. Title change / Pasted text / prompt
+  # fingerprint = already landed → enter-only, never stack a full re-paste.
+  # Full re-prompt only when the composer still looks empty. Policy:
+  # fleet_lib.nonpi_prompt_policy / prompt_already_landed.
+  local title=""
+  local saw_landed=0
+  local accept_now=0
+
+  _fetch_state() {
+    python3 -c 'import json,sys
 d=json.loads(sys.stdin.read()); name=sys.argv[1]
 for a in d["result"]["agents"]:
   if a.get("name")==name:
-    print(a.get("agent_status","missing")); raise SystemExit
-print("missing")' "$herdr_name" 2>/dev/null || echo missing)
+    title=a.get("terminal_title_stripped") or a.get("terminal_title") or ""
+    print(a.get("agent_status","missing") + "\t" + title.replace("\t"," ").replace("\n"," "))
+    raise SystemExit
+print("missing\t")' "$herdr_name" 2>/dev/null || echo missing$'\t'
+  }
+
+  _landed_now() {
+    python3 - <<'PY' "$SKILL_DIR" "$title" "$herdr_name" "$prompt_file" "$idle_ticks"
+import subprocess, sys
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+title, name, prompt_path, tick_s = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+prompt = open(prompt_path, encoding="utf-8", errors="replace").read()
+tick = int(tick_s)
+pane = ""
+if not fl.title_left_cold(title) and tick in (3, 6):
+    try:
+        pane = subprocess.check_output(
+            ["herdr", "agent", "read", name, "--source", "recent-unwrapped",
+             "--lines", "80", "--format", "text"],
+            text=True, timeout=15,
+        )
+    except Exception:
+        pane = ""
+print("yes" if fl.prompt_already_landed(title=title, pane_text=pane, prompt_text=prompt) else "no")
+PY
+  }
+
+  _nonpi_recover_tick() {
+    idle_ticks=$((idle_ticks + 1))
+    local landed=0
+    if [[ "$saw_landed" -eq 1 ]] || [[ "$(_landed_now)" == "yes" ]]; then
+      landed=1
+      saw_landed=1
+    fi
+    local action
+    action=$(python3 -c 'import sys
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+print(fl.nonpi_prompt_policy(idle_ticks=int(sys.argv[2]), landed=sys.argv[3]=="1"))' \
+      "$SKILL_DIR" "$idle_ticks" "$landed")
+    case "$action" in
+      enter)
+        if [[ "$nudged" -eq 0 ]]; then
+          nudged=1
+          log "prompt still $st for $herdr_name kind=$kind; enter-only nudge once"
+          herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
+        fi
+        ;;
+      repaste)
+        if [[ "$resubmitted" -eq 0 ]]; then
+          resubmitted=1
+          log "prompt still $st for $herdr_name kind=$kind; full re-prompt once (no land evidence)"
+          _submit || true
+        fi
+        ;;
+      skip_repaste)
+        log "prompt still $st for $herdr_name kind=$kind; already landed — skip full re-prompt"
+        ;;
+      accept)
+        log "prompt accepted as landed ($st) herdr_name=$herdr_name kind=$kind"
+        accept_now=1
+        ;;
+      fail)
+        ;;
+      wait) ;;
+    esac
+  }
+
+  # 30 * 2s = 60s. Landed+idle returns early via policy (accept after enter).
+  for ((i=1; i<=30; i++)); do
+    local state
+    state=$(herdr agent list 2>/dev/null | _fetch_state)
+    st=${state%%$'\t'*}
+    title=${state#*$'\t'}
+    [[ "$st" == "$state" ]] && title=""
     case "$st" in
       working)
         saw_active=1
         return 0
         ;;
       done|blocked)
-        return 0
+        if [[ "$kind" == "pi" || "$saw_active" -eq 1 ]]; then
+          return 0
+        fi
+        log "non-pi $st without working for $herdr_name; treating as unseen idle"
+        _nonpi_recover_tick
         ;;
       idle)
         if [[ "$saw_active" -eq 1 ]]; then
           return 0
         fi
-        idle_ticks=$((idle_ticks + 1))
         if [[ "$kind" == "pi" ]]; then
+          idle_ticks=$((idle_ticks + 1))
           # Fast pi turns can settle idle before we sample working; accept soon.
           if [[ "$idle_ticks" -ge 2 ]]; then
             log "prompt accepted as idle (pi) herdr_name=$herdr_name"
             return 0
           fi
         else
-          # Non-pi: one enter-only nudge after ~6s; never full re-submit.
-          if [[ "$idle_ticks" -eq 3 && "$nudged" -eq 0 ]]; then
-            nudged=1
-            log "prompt still idle for $herdr_name kind=$kind; enter-only nudge once"
-            herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
-          fi
-          if [[ "$idle_ticks" -ge 8 ]]; then
-            log "prompt accepted as idle (no working observed) herdr_name=$herdr_name kind=$kind"
-            return 0
-          fi
+          _nonpi_recover_tick
         fi
         ;;
       unknown) ;;
       missing) ;;
     esac
+    if [[ "$accept_now" -eq 1 ]]; then
+      return 0
+    fi
     sleep 2
   done
+  if [[ "$saw_landed" -eq 1 ]]; then
+    log "prompt submitted; still $st but already landed — treating as accepted herdr_name=$herdr_name kind=$kind"
+    return 0
+  fi
   log "prompt submitted but status still $st for $herdr_name kind=$kind (NOT treating as success)"
   return 1
 }
 
+prompt_one() {
+  # $1 short  $2 herdr_name  $3 kind  $4 pane  $5 model
+  # Writes $OUTDIR/$short/prompt_status.txt so parallel jobs do not clobber agents.json.
+  local short=$1 herdr_name=$2 kind=$3 pane=${4:-} model=${5:-}
+  local stfile="$OUTDIR/$short/prompt_status.txt"
+  mkdir -p "$OUTDIR/$short"
+  log "prompting $herdr_name kind=$kind"
+  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS" "$kind" "$pane" "$model" "$short"; then
+    log "prompted $herdr_name (accepted)"
+    printf '%s\n' "working" >"$stfile"
+    return 0
+  fi
+  log "prompt failed $herdr_name"
+  printf '%s\n' "failed" >"$stfile"
+  return 1
+}
+
+apply_prompt_statuses() {
+  python3 - <<'PY' "$OUTDIR"
+import json, sys
+from pathlib import Path
+outdir = Path(sys.argv[1])
+rows = json.loads((outdir / "agents.json").read_text())
+for r in rows:
+    if r.get("start_status") != "started":
+        continue
+    p = outdir / r["name"] / "prompt_status.txt"
+    r["prompt_status"] = p.read_text().strip() if p.exists() else "unknown"
+(outdir / "agents.json").write_text(json.dumps(rows, indent=2) + "\n")
+PY
+}
+
 # --- preflight ---
-log "preflight label=$LABEL cwd=$CWD agents=${#AGENTS[@]} prefix=$SESSION_PREFIX kind=$AGENT_KIND"
+log "preflight label=$LABEL cwd=$CWD agents=${#AGENTS[@]} prefix=$SESSION_PREFIX kind=$AGENT_KIND parallel_prompt=$PARALLEL_PROMPT"
 herdr status >/dev/null
 model_preflight
 AGENTS_JSON=$(validate_and_expand_agents)
@@ -573,6 +773,7 @@ Path("$OUTDIR/policy.json").write_text(json.dumps({
     "tab_id": "$TAB_ID",
     "agent_kind_default": "$AGENT_KIND",
     "agent_kinds": kinds,
+    "parallel_prompt": bool(int("$PARALLEL_PROMPT")),
     "close_after": "main_agent_synthesis",
     "keep_on_partial_or_blocked": True,
 }, indent=2) + "\n")
@@ -662,7 +863,16 @@ print(json.dumps(rows, indent=2))
 PY
 
 # --- prompt started agents ---
+# Default: one background job per started agent (submit+accept wait overlap).
+# --serial-prompt: old one-by-one wait. agent start stays serial either way.
 PROMPT_FILE_ABS=$(abspath "$PROMPT_FILE")
+PROMPT_PIDS=()
+PROMPT_N=0
+PROMPT_MODE=serial
+if [[ "$PARALLEL_PROMPT" -eq 1 ]]; then
+  PROMPT_MODE=parallel
+fi
+log "prompt-fanout start mode=$PROMPT_MODE"
 for row in "${ROWS[@]}"; do
   IFS='|' read -r short herdr_name model pane kind <<<"$row"
   st=$(python3 -c 'import json,sys; rows=json.load(open(sys.argv[1]));
@@ -671,20 +881,27 @@ print(next(r["start_status"] for r in rows if r["name"]==sys.argv[2]))' "$OUTDIR
     log "skip prompt $herdr_name (start_status=$st)"
     continue
   fi
-  log "prompting $herdr_name kind=$kind"
-  if prompt_agent "$herdr_name" "$PROMPT_FILE_ABS" "$kind"; then
-    log "prompted $herdr_name (accepted)"
-    python3 -c 'import json,sys; p=sys.argv[1]; n=sys.argv[2]; rows=json.load(open(p));
-[(r.update({"prompt_status":"working"}) if r["herdr_name"]==n else None) for r in rows];
-json.dump(rows, open(p,"w"), indent=2); open(p,"a").write("\n")' "$OUTDIR/agents.json" "$herdr_name"
+  PROMPT_N=$((PROMPT_N + 1))
+  if [[ "$PARALLEL_PROMPT" -eq 1 ]]; then
+    prompt_one "$short" "$herdr_name" "$kind" "$pane" "$model" &
+    PROMPT_PIDS+=($!)
   else
-    FAIL=1
-    log "prompt failed $herdr_name"
-    python3 -c 'import json,sys; p=sys.argv[1]; n=sys.argv[2]; rows=json.load(open(p));
-[(r.update({"prompt_status":"failed"}) if r["herdr_name"]==n else None) for r in rows];
-json.dump(rows, open(p,"w"), indent=2); open(p,"a").write("\n")' "$OUTDIR/agents.json" "$herdr_name"
+    prompt_one "$short" "$herdr_name" "$kind" "$pane" "$model" || FAIL=1
   fi
 done
+if [[ "$PARALLEL_PROMPT" -eq 1 && ${#PROMPT_PIDS[@]} -gt 0 ]]; then
+  log "prompt-fanout waiting n=${#PROMPT_PIDS[@]}"
+  set +e
+  for pid in "${PROMPT_PIDS[@]}"; do
+    wait "$pid"
+    if [[ $? -ne 0 ]]; then
+      FAIL=1
+    fi
+  done
+  set -e
+fi
+log "prompt-fanout done mode=$PROMPT_MODE n=$PROMPT_N fail=$FAIL"
+apply_prompt_statuses
 
 herdr agent list | python3 -c '
 import json,sys

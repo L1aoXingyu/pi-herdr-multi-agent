@@ -70,8 +70,14 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual((short, kind, model), ("g37flash", "agy", "gemini-3.7-flash-high"))
         short, kind, model = fl.parse_agent_spec("g38flash=cursor:gemini-3.8-flash-high")
         self.assertEqual((short, kind, model), ("g38flash", "cursor", "gemini-3.8-flash-high"))
+        short, kind, model = fl.parse_agent_spec("musespark=cursor:muse-spark-1.3-max")
+        self.assertEqual((short, kind, model), ("musespark", "cursor", "muse-spark-1.3-max"))
         short, kind, model = fl.parse_agent_spec("glm53=siliconflow/zai-org/GLM-5.3:max")
         self.assertEqual((short, kind, model), ("glm53", "pi", "siliconflow/zai-org/GLM-5.3:max"))
+        short, kind, model = fl.parse_agent_spec("gpt6astra=codex:gpt-6-astra:high")
+        self.assertEqual((short, kind, model), ("gpt6astra", "codex", "gpt-6-astra:high"))
+        short, kind, model = fl.parse_agent_spec("dsv4flash=dsh:deepseek-flash:max")
+        self.assertEqual((short, kind, model), ("dsv4flash", "dsh", "deepseek-flash:max"))
 
 
 class MatchModelTests(unittest.TestCase):
@@ -95,6 +101,9 @@ gpt-5.5-high - GPT-5.5 1M High
 gemini-3.8-flash-high - Gemini 3.8 Flash High
 gemini-3.8-flash-medium - Gemini 3.8 Flash Medium
 gemini-3.8-flash-low - Gemini 3.8 Flash Low
+muse-spark-1.3-max - Muse Spark 1.3 1M Max
+muse-spark-1.3-high - Muse Spark 1.3 1M
+muse-spark-1.3-medium - Muse Spark 1.3 1M Medium
 """
 
     def test_pi_matches_with_thinking_suffix(self):
@@ -113,8 +122,11 @@ gemini-3.8-flash-low - Gemini 3.8 Flash Low
         self.assertTrue(fl.match_model(self.CURSOR_HAY, "claude-fable-5-high", "cursor"))
         self.assertTrue(fl.match_model(self.CURSOR_HAY, "kimi-k3-max", "cursor"))
         self.assertTrue(fl.match_model(self.CURSOR_HAY, "gemini-3.8-flash-high", "cursor"))
+        self.assertTrue(fl.match_model(self.CURSOR_HAY, "muse-spark-1.3-max", "cursor"))
         self.assertFalse(fl.match_model(self.CURSOR_HAY, "kimi-k3", "cursor"))
         self.assertFalse(fl.match_model(self.CURSOR_HAY, "gemini-3.8-flash", "cursor"))
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "muse-spark-1.3", "cursor"))
+        self.assertFalse(fl.match_model(self.CURSOR_HAY, "muse-spark", "cursor"))
         # substring / prefix must not match a different id
         self.assertFalse(
             fl.match_model(self.CURSOR_HAY, "claude-fable-5-thinking", "cursor")
@@ -173,6 +185,27 @@ class StartArgsTests(unittest.TestCase):
             ],
         )
 
+    def test_codex_args_split_effort_and_bypass(self):
+        self.assertEqual(
+            fl.start_native_args(
+                "codex",
+                "gpt-6-astra:high",
+                session_dir="/tmp/x/c",
+                herdr_name="rev-gpt6astra",
+            ),
+            [
+                "--model",
+                "gpt-6-astra",
+                "-c",
+                'model_reasoning_effort="high"',
+                "--dangerously-bypass-approvals-and-sandbox",
+                "--dangerously-bypass-hook-trust",
+            ],
+        )
+        self.assertEqual(fl.split_model_effort("gpt-6-astra:high"), ("gpt-6-astra", "high"))
+        self.assertEqual(fl.split_model_effort("gpt-6-astra:medium"), ("gpt-6-astra", "medium"))
+        self.assertEqual(fl.split_model_effort("gpt-6-astra"), ("gpt-6-astra", None))
+
     def test_agy_args_skip_permissions(self):
         self.assertEqual(
             fl.start_native_args(
@@ -189,10 +222,19 @@ class StartArgsTests(unittest.TestCase):
         )
 
 
+class WhichCursorCliTests(unittest.TestCase):
+    def test_preflight_does_not_use_proxy_binary(self):
+        import inspect
+
+        src = inspect.getsource(fl.which_cursor_cli)
+        self.assertNotIn("cursor-agent-proxy", src)
+        self.assertIn('"cursor-agent"', src)
+
+
 class ExpandNameTests(unittest.TestCase):
     def test_namespace(self):
         self.assertEqual(fl.expand_herdr_name("mixed-kind-rev", "fable5"), "mixed-kind-rev-fable5")
-        self.assertTrue(fl.NAME_RE.match(fl.expand_herdr_name("r", "gpt56sol")))
+        self.assertTrue(fl.NAME_RE.match(fl.expand_herdr_name("r", "gpt6astra")))
 
 
 if __name__ == "__main__":

@@ -1,30 +1,34 @@
 # pi-herdr-multi-agent
 
-Multi-model **interactive Pi TUI** fleets inside [Herdr](https://github.com/herdrdev/herdr), packaged as a [pi](https://pi.dev) skill.
+Pi parent-harness of the multi-model Herdr fleet skill. Fleet behavior tracks the
+`grok` branch (Codex + dsh-TUI + Cursor seats, landed detection, parallel prompt);
+parent wait is Pi `bg_run` + `watchdog.sh`.
 
-Launch N visible Pi panes in one labeled tab, give them the same prompt, wait with a background watchdog, harvest machine-readable `VERDICT:` blocks, synthesize consensus in the main agent, then auto-close the review tab.
+Launch N visible agent panes in one labeled Herdr tab, give them the same prompt,
+wait with a background watchdog, harvest machine-readable `VERDICT:` blocks,
+synthesize consensus in the **Pi** parent, then auto-close the review tab.
 
-Prefer this over headless `pi-subagents` when **TUI visibility** matters. Prefer headless subagents when you only need the final text.
+Prefer this over headless subagents when **TUI visibility** matters.
+Prefer headless subagents when you only need the final text.
 
 ## Requirements
 
-- [pi](https://pi.dev) coding agent
-- [Herdr](https://github.com/herdrdev/herdr) **≥ 0.7.5** (`herdr` on `PATH`, server running) — tested on 0.8.x
+- [Pi coding agent](https://github.com/badlogic/pi-mono) (parent orchestrator)
+- [Herdr](https://github.com/herdrdev/herdr) **≥ 0.7.5** (`herdr` on `PATH`, server running) — tested on 0.8.x / 0.9.x
 - `python3` and `bash` on `PATH` (scripts avoid bash-4-only `mapfile` / GNU `readlink -f`)
-- Model providers already configured in your pi auth / `models.json`
+- Fleet pane kinds (default: Codex + Pi + Cursor + dsh-TUI) already logged in on this machine
 
-## Install
+## Install (Pi)
 
 ```bash
 pi install git:github.com/L1aoXingyu/pi-herdr-multi-agent
 ```
 
-Restart pi (or start a new session) so the skill is discovered. Invoke with `/skill:herdr-multi-agent` or by asking for a multi-model Herdr review.
-
-Local checkout:
+Or a local checkout / skill dir:
 
 ```bash
-pi install /absolute/path/to/pi-herdr-multi-agent
+git clone git@github.com:L1aoXingyu/pi-herdr-multi-agent.git
+ln -sfn "$(pwd)/pi-herdr-multi-agent/skills/herdr-multi-agent" ~/.pi/agent/skills/herdr-multi-agent
 ```
 
 ## What you get
@@ -32,11 +36,11 @@ pi install /absolute/path/to/pi-herdr-multi-agent
 | File | Role |
 |------|------|
 | `skills/herdr-multi-agent/SKILL.md` | Agent SOP (launch → wait → harvest → synthesize → close) |
-| `launch.sh` | Create tab, split panes, serial `agent start`, prompt fanout |
+| `launch.sh` | Create tab, split panes, serial `agent start`, parallel prompt fanout (`--serial-prompt` to disable) |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual six** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **heavy seven** / max diversity |
+| `fleet.defaults` | Author daily default — **usual seven** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **heavy eight** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -50,7 +54,8 @@ OUTDIR=/tmp/herdr-multi-my-review
 mkdir -p "$OUTDIR"
 
 cat >"$OUTDIR/prompt.txt" <<'EOF'
-READ-ONLY REVIEW — do not edit files, do not run long jobs.
+NO-WRITE REVIEW — do not edit project files, do not commit, do not start servers, do not run long jobs (training, downloads, GPU, overnight builds).
+You MAY run short commands to get feedback: tests, compilers, small reproducers, git, grep. Put scratch output in /tmp. Do not write the shared project cwd.
 
 Review the change described below.
 ...
@@ -72,7 +77,7 @@ bash "$SKILL_DIR/launch.sh" \
   # optional: --fleet-file ./my-fleet.txt
   # optional: --keep
 
-# background wait (do not foreground-poll in the main agent turn):
+# bg_run this (never foreground-poll):
 bash "$SKILL_DIR/watchdog.sh" --outdir "$OUTDIR"
 
 # after reading results/summary.txt and posting consensus:
@@ -81,41 +86,46 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual six** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual seven** (daily lean profile):
 
-- anchors: Cursor `gpt-5.6-sol-xhigh` + Cursor `claude-fable-5-1-thinking-high`
-- Cursor seats: `k3max=cursor:kimi-k3-max` and `g38flash=cursor:gemini-3.8-flash-high`
+- anchors: Codex `gpt-6-astra:high` + Cursor `claude-fable-5-1-thinking-high`
+- Codex seat: `gpt6astra=codex:gpt-6-astra:high`
+- Cursor seats: `k3max=cursor:kimi-k3-max`, `g38flash=cursor:gemini-3.8-flash-high`, and `musespark=cursor:muse-spark-1.3-max`
 - no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
-- SiliconFlow daily seats: `dsv4flash` (V4-Flash-0731) + `glm53=siliconflow/zai-org/GLM-5.3:max`; `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, and `g37flash` are out of both fleets
+- no Cursor Sol seat; `gpt56sol` is out of both fleets
+- Daily DeepSeek seat: `dsv4flash=dsh:deepseek-flash:max` (dsh-TUI + official V4.1 Flash)
+- SiliconFlow daily seat: `glm53=siliconflow/zai-org/GLM-5.3:max`
+- `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, and `gpt56sol` are out of both fleets.
 
-Heavy / max-diversity **seven** lives in `fleet.full`:
+Heavy / max-diversity **eight** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
 Both profiles **fail preflight** on machines without the required providers/CLIs
-(missing `pi` or `agent`/`cursor-agent` when listed is a hard error, not a silent skip).
+(missing `pi`, `codex`, or `agent`/`cursor-agent` when listed is a hard error, not a silent skip).
 For third-party use:
 
 1. Copy `skills/herdr-multi-agent/fleet.example` → your own file and edit, or
 2. Pass `--fleet-file PATH` (including shipped `fleet.full`), or
 3. Pass one or more `--agent name=provider/model[:thinking]` or `--agent name=kind:model`
 
-Discover models with `pi --list-models` and (for Cursor) `agent --list-models`.
-`launch.sh` preflights via shared `fleet_lib.py` (exact cursor id match; pi token match).
+Discover models with `pi --list-models`, `codex login status`, and (for Cursor) `agent --list-models`.
+`launch.sh` preflights via shared `fleet_lib.py` (exact cursor id match; pi token match; Codex cache).
 Override with `--skip-model-preflight` only if you know what you're doing.
 
 Cursor rows start with `--trust --force` (UI **Run Everything**) so unattended fleets do not
-block on shell allowlist prompts. Treat that as full tool autonomy.
+block on shell allowlist prompts. Codex rows pass `--dangerously-bypass-approvals-and-sandbox`
+and `--dangerously-bypass-hook-trust`. Treat both as full tool autonomy.
 
 Mixed-kind example:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... \
-  --agent gpt56sol=cursor:gpt-5.6-sol-xhigh \
+  --agent gpt6astra=codex:gpt-6-astra:high \
   --agent fable51=cursor:claude-fable-5-1-thinking-high
 ```
 
@@ -184,20 +194,26 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ## Changelog
 
-### Unreleased
+### Unreleased (`main`)
 
-- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (do not `pane run cursor-agent-proxy`)
+- Sync fleet/wait/harvest from `grok` (`a65a6b8`); Pi parent still uses `bg_run` + `watchdog.sh`
+- Daily usual seven: `gpt6astra` Codex high, `dsv4flash` dsh-TUI, `glm53`, `fable51`, `k3max`, `g38flash`, `musespark`; heavy eight adds `mimopro`
+- Drop `cursor-agent-proxy`: preflight and start both use canonical `cursor-agent` (37890 via pane-export / list-models env)
+- Cursor prompt recovery: `prompt_already_landed` / `nonpi_prompt_policy` — enter-only when the first paste already landed; no stacked full re-prompt
+- `which_cursor_cli` rejects Grok's `~/.grok/bin/agent`; require `cursor-agent`
+- Narrow-pane `VERDICT:` unwrap in `verdict_lib.py`; watchdog writes `progress.json` + `runtime-status.json`
+- Parallel prompt fanout by default (`--serial-prompt` to disable)
+- Unit tests: `skills/herdr-multi-agent/tests/test_prompt_landed.py`
+
+### Previously on `main`
+
+- Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (canonical `cursor-agent`; no `cursor-agent-proxy`)
 - Add `glm53=siliconflow/zai-org/GLM-5.3:max` to both fleets; daily is usual six, heavy is seven
 - Add `g38flash=cursor:gemini-3.8-flash-high` to both fleets; Cursor Gemini is `g38flash` (not agy)
-- Switch Fable seat to `fable51=cursor:claude-fable-5-1-thinking-high` (short name cannot contain a dot)
-- Drop `g37flash=agy:gemini-3.7-flash-high` from both fleets (Antigravity path); Cursor Gemini is `g38flash`
-- Drop `oxalpha=openrouter/stealth/ox-alpha:max` from both fleets (OpenRouter stealth/ox-alpha unusable)
-- Drop `hy3=opencode-go/hy3:max` from both fleets (OpenCode Go quota exhausted)
-- Drop `glm53=opencode-go/glm-5.3:max` from both fleets (OpenCode Go quota exhausted)
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
-- Cursor default seats: `fable51=cursor:claude-fable-5-1-thinking-high` and `k3max=cursor:kimi-k3-max` with `--trust --force` (Run Everything)
+- Cursor default seats: `fable51=cursor:claude-fable-5-1-thinking-high`, `k3max=cursor:kimi-k3-max`, `g38flash=cursor:gemini-3.8-flash-high`, and `musespark=cursor:muse-spark-1.3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
-- Dual fleet profiles: **usual six** `fleet.defaults` (daily) + **heavy seven** `fleet.full`
+- Dual fleet profiles: **usual seven** `fleet.defaults` (daily) + **heavy eight** `fleet.full`
 - No daily Go seat; heavy Go seat is `mimopro` only. No OpenRouter seat; no Antigravity seat; `oxalpha` / `hy3` / `glm52` / `k27code` / `dots3` / `g37flash` dropped
 - Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications

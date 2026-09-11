@@ -33,6 +33,7 @@ pass "fleet.defaults (${#LINES[@]} agents)"
 help_out=$("$SKILL/launch.sh" --help)
 grep -q -- '--fleet-file' <<<"$help_out" || fail "launch help missing --fleet-file"
 grep -q -- '--skip-model-preflight' <<<"$help_out" || fail "launch help missing --skip-model-preflight"
+grep -q -- '--serial-prompt' <<<"$help_out" || fail "launch help missing --serial-prompt"
 grep -q -- '--agent' <<<"$help_out" || fail "launch help missing --agent"
 pass "launch.sh --help"
 
