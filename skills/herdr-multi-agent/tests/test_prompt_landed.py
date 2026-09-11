@@ -65,6 +65,44 @@ class TitleTests(unittest.TestCase):
     def test_spinner_stripped_title(self):
         self.assertTrue(fl.title_left_cold("- Routing File Reviewer"))
 
+    def test_codex_argv_title_is_cold(self):
+        t = "codex --model gpt-6-astra -c 'model_reasoning_effort=\"high\"'"
+        self.assertTrue(fl.title_is_cold(t))
+        self.assertFalse(fl.title_left_cold(t))
+        self.assertFalse(
+            fl.prompt_already_landed(title=t, kind="codex", cwd="/tmp/herdr-multi-pidry")
+        )
+
+    def test_cwd_folder_title_is_cold(self):
+        self.assertTrue(
+            fl.title_is_cold("herdr-multi-pidry", cwd="/tmp/herdr-multi-pidry")
+        )
+        self.assertFalse(
+            fl.title_left_cold("herdr-multi-pidry", cwd="/tmp/herdr-multi-pidry")
+        )
+
+    def test_codex_ignores_session_like_title(self):
+        # Cursor would treat this as landed; Codex cwd/argv titles must not.
+        self.assertTrue(fl.prompt_already_landed(title="Routing File Reviewer"))
+        self.assertFalse(
+            fl.prompt_already_landed(
+                title="Routing File Reviewer",
+                kind="codex",
+                cwd="/tmp/herdr-multi-pidry",
+            )
+        )
+
+    def test_codex_landed_via_fingerprint(self):
+        self.assertTrue(
+            fl.prompt_already_landed(
+                title="herdr-multi-pidry",
+                pane_text="ROLE: Dry-run seat for Pi herdr-multi-agent after grok sync.\n",
+                prompt_text="ROLE: Dry-run seat for Pi herdr-multi-agent after grok sync.\nONLY: Reply PONG.\n",
+                kind="codex",
+                cwd="/tmp/herdr-multi-pidry",
+            )
+        )
+
 
 class PaneTests(unittest.TestCase):
     def test_pasted_text_marker(self):

@@ -644,6 +644,19 @@ COLD_TITLES = frozenset(
         "codex",
         "codex cli",
         "codex-cli",
+        "openai codex",
+    }
+)
+COLD_TITLE_HEADS = frozenset(
+    {
+        "codex",
+        "cursor",
+        "cursor-agent",
+        "cursor-agent-proxy",
+        "agent",
+        "agy",
+        "antigravity",
+        "openai",
     }
 )
 PASTED_TEXT_RE = re.compile(r"\[\s*Pasted text #\d+", re.I)
@@ -659,10 +672,30 @@ def normalize_title(title: str | None) -> str:
     return t.lstrip("-–— ").strip()
 
 
-def title_left_cold(title: str | None) -> bool:
-    """True when the session title is no longer a cursor cold-start default."""
+def title_is_cold(title: str | None, *, cwd: str | None = None) -> bool:
+    """True for CLI argv / default chrome / cwd-folder titles, not session names."""
     t = normalize_title(title).lower()
-    return bool(t) and t not in COLD_TITLES
+    if not t or t in COLD_TITLES:
+        return True
+    if t.startswith("openai codex"):
+        return True
+    head = t.split()[0]
+    if head in COLD_TITLE_HEADS:
+        return True
+    if cwd:
+        try:
+            base = Path(cwd).resolve().name.lower()
+        except OSError:
+            base = Path(cwd).name.lower()
+        if base and (t == base or t.endswith(" " + base) or t.endswith(" - " + base)):
+            return True
+    return False
+
+
+def title_left_cold(title: str | None, *, cwd: str | None = None) -> bool:
+    """True when the session title looks like a Cursor ROLE rename, not chrome."""
+    t = normalize_title(title)
+    return bool(t) and not title_is_cold(title, cwd=cwd)
 
 
 def prompt_fingerprints(prompt_text: str | None) -> list[str]:
@@ -690,13 +723,17 @@ def prompt_already_landed(
     title: str | None = None,
     pane_text: str | None = None,
     prompt_text: str | None = None,
+    kind: str | None = None,
+    cwd: str | None = None,
 ) -> bool:
     """True if a full re-prompt would likely stack a duplicate brief.
 
-    Any one signal is enough: title left the cold default, Cursor paste
-    marker, or a fingerprint line from the prompt file in the pane.
+    Cursor: session-title rename, Pasted text, or a fingerprint line.
+    Codex: never trust the title (cwd / `codex --model …` look "renamed").
+    Require pane paste marker or a prompt fingerprint.
     """
-    if title_left_cold(title):
+    kind = (kind or "").strip().lower()
+    if kind != "codex" and title_left_cold(title, cwd=cwd):
         return True
     pane = pane_text or ""
     if PASTED_TEXT_RE.search(pane) or PASTED_TEXT_BARE_RE.search(pane):

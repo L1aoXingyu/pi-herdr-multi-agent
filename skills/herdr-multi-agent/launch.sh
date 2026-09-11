@@ -526,6 +526,7 @@ prompt_agent() {
   local resp rc st i
   local saw_active=0
   local idle_ticks=0
+  local working_ticks=0
   local nudged=0
   local resubmitted=0
 
@@ -599,15 +600,18 @@ print("missing\t")' "$herdr_name" 2>/dev/null || echo missing$'\t'
   }
 
   _landed_now() {
-    python3 - <<'PY' "$SKILL_DIR" "$title" "$herdr_name" "$prompt_file" "$idle_ticks"
+    python3 - <<'PY' "$SKILL_DIR" "$title" "$herdr_name" "$prompt_file" "$idle_ticks" "$kind" "$CWD"
 import subprocess, sys
 sys.path.insert(0, sys.argv[1])
 import fleet_lib as fl
 title, name, prompt_path, tick_s = sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+kind, cwd = sys.argv[6], sys.argv[7]
 prompt = open(prompt_path, encoding="utf-8", errors="replace").read()
 tick = int(tick_s)
+kw = dict(title=title, prompt_text=prompt, kind=kind, cwd=cwd)
 pane = ""
-if not fl.title_left_cold(title) and tick in (3, 6):
+# Title-only is not evidence for Codex (cwd / argv). Read the pane on recover ticks.
+if not fl.prompt_already_landed(**kw) and tick in (3, 6):
     try:
         pane = subprocess.check_output(
             ["herdr", "agent", "read", name, "--source", "recent-unwrapped",
@@ -616,7 +620,7 @@ if not fl.title_left_cold(title) and tick in (3, 6):
         )
     except Exception:
         pane = ""
-print("yes" if fl.prompt_already_landed(title=title, pane_text=pane, prompt_text=prompt) else "no")
+print("yes" if fl.prompt_already_landed(pane_text=pane, **kw) else "no")
 PY
   }
 
@@ -671,17 +675,26 @@ print(fl.nonpi_prompt_policy(idle_ticks=int(sys.argv[2]), landed=sys.argv[3]=="1
     case "$st" in
       working)
         saw_active=1
-        return 0
-        ;;
-      done|blocked)
-        if [[ "$kind" == "pi" || "$saw_active" -eq 1 ]]; then
+        # Codex often flickers working during prompt inject, then idle with an
+        # empty composer. Require two working samples (~4s) before trusting it.
+        if [[ "$kind" != "codex" ]]; then
           return 0
         fi
-        log "non-pi $st without working for $herdr_name; treating as unseen idle"
+        working_ticks=$((working_ticks + 1))
+        if (( working_ticks >= 2 )); then
+          return 0
+        fi
+        log "codex working sample $working_ticks/2 herdr_name=$herdr_name; waiting to confirm"
+        ;;
+      done|blocked)
+        if [[ "$kind" == "pi" || ( "$saw_active" -eq 1 && "$kind" != "codex" ) ]]; then
+          return 0
+        fi
+        log "non-pi $st without confirmed work for $herdr_name; treating as unseen idle"
         _nonpi_recover_tick
         ;;
       idle)
-        if [[ "$saw_active" -eq 1 ]]; then
+        if [[ "$saw_active" -eq 1 && "$kind" != "codex" ]]; then
           return 0
         fi
         if [[ "$kind" == "pi" ]]; then
