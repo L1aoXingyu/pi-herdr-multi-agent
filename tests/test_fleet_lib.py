@@ -198,6 +198,8 @@ class StartArgsTests(unittest.TestCase):
                 "gpt-6-astra",
                 "-c",
                 'model_reasoning_effort="high"',
+                "-c",
+                "check_for_update_on_startup=false",
                 "--dangerously-bypass-approvals-and-sandbox",
                 "--dangerously-bypass-hook-trust",
             ],
