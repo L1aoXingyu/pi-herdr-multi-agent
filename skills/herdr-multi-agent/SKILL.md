@@ -279,7 +279,7 @@ in `agents.json`) to avoid collisions with leftover agents. Short names stay sta
 Harvest validation uses `$SKILL_DIR/verdict_lib.py` (strict trailer; ignores prompt echoes).
 
 Default models live in `$SKILL_DIR/fleet.defaults` (edit, or override with `--agent` /
-`--fleet-file`). They are **examples** — every model id must already work in the caller's pi config.
+`--fleet-file`). They are **examples** — every model id must already work in the caller's Grok/cursor/codex/dsh config. This parent is Grok Build; do not require a Pi model list.
 
 If the helper is missing or fails, follow the manual SOP below (same semantics).
 
@@ -385,6 +385,7 @@ Notes:
 - Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
   still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
 - Mixed fleets are supported: each row in `agents.json` carries its own `kind`.
+- When the user names a cursor-cli failure, do not also start Pi seats.
 - Prompt recovery is **kind-aware**: pi never re-pastes the full prompt on idle; non-pi sends an
   enter-only nudge. Full re-prompt only if the composer still looks empty (default `Cursor Agent`
   title, no `Pasted text`, no ROLE/ONLY fingerprint). Title change or a paste marker means the
