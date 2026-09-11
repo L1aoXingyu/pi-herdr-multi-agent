@@ -595,6 +595,9 @@ def start_native_args(kind: str, model: str, *, session_dir: str, herdr_name: st
         args = ["--model", model_id]
         if effort:
             args.extend(["-c", f'model_reasoning_effort="{effort}"'])
+        # TUI auto-update returns to a shell ("Please restart Codex") and herdr
+        # reports agent_not_ready/blocked during that banner.
+        args.extend(["-c", "check_for_update_on_startup=false"])
         # unattended: skip approval + hook-trust UIs (same blast radius as cursor --force)
         args.append("--dangerously-bypass-approvals-and-sandbox")
         args.append("--dangerously-bypass-hook-trust")

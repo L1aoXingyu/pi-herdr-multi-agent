@@ -452,6 +452,25 @@ start_agent() {
       rc=$?
     fi
     set -e
+    if [[ $rc -ne 0 ]] || grep -q '"error"' <<<"$resp"; then
+      # Codex update banner: blocked during start, then either idle TUI or a shell.
+      if grep -q 'agent_not_ready' <<<"$resp"; then
+        log "start not-ready; waiting herdr_name=$herdr_name kind=$kind"
+        set +e
+        herdr agent wait "$herdr_name" --until idle --until done --timeout 60000 >/dev/null 2>&1
+        set -e
+      fi
+      live_st=$(herdr agent list 2>/dev/null | python3 -c 'import json,sys
+d=json.loads(sys.stdin.read()); name=sys.argv[1]
+for a in d["result"]["agents"]:
+  if a.get("name")==name:
+    print(a.get("agent_status","")); raise SystemExit
+print("missing")' "$herdr_name" 2>/dev/null || echo missing)
+      if [[ "$live_st" == "idle" || "$live_st" == "done" ]]; then
+        log "start recovered as $live_st herdr_name=$herdr_name kind=$kind"
+        return 0
+      fi
+    fi
     if [[ $rc -eq 0 ]] && ! grep -q '"error"' <<<"$resp"; then
       set +e
       herdr agent wait "$herdr_name" --until idle --until done --timeout 30000 >/dev/null 2>&1
