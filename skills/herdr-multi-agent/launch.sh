@@ -36,6 +36,7 @@ Spec formats:
                                    #      gpt6astra=codex:gpt-6-astra:high
                                    #      dsv4flash=dsh:deepseek-flash:max
                                    #      glm53=siliconflow/zai-org/GLM-5.3:max
+                                   #      hy4prev=siliconflow/tencent/Hy4-preview:max
 
 Pi models must exist in the caller's pi config; cursor models are checked via
 `cursor-agent --list-models` (bare `agent` only if it is cursor-cli, not Grok).

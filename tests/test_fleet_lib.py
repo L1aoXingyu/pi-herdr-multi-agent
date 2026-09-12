@@ -74,6 +74,8 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual((short, kind, model), ("musespark", "cursor", "muse-spark-1.3-max"))
         short, kind, model = fl.parse_agent_spec("glm53=siliconflow/zai-org/GLM-5.3:max")
         self.assertEqual((short, kind, model), ("glm53", "pi", "siliconflow/zai-org/GLM-5.3:max"))
+        short, kind, model = fl.parse_agent_spec("hy4prev=siliconflow/tencent/Hy4-preview:max")
+        self.assertEqual((short, kind, model), ("hy4prev", "pi", "siliconflow/tencent/Hy4-preview:max"))
         short, kind, model = fl.parse_agent_spec("gpt6astra=codex:gpt-6-astra:high")
         self.assertEqual((short, kind, model), ("gpt6astra", "codex", "gpt-6-astra:high"))
         short, kind, model = fl.parse_agent_spec("dsv4flash=dsh:deepseek-flash:max")
