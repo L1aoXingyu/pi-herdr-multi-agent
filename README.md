@@ -50,8 +50,8 @@ git checkout pi-2026-09-05
 | `launch.sh` | Create tab, split panes, serial `agent start`, parallel prompt fanout (`--serial-prompt` to disable) |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual seven** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **heavy eight** / max diversity |
+| `fleet.defaults` | Author daily default — **usual eight** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **heavy nine** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -97,7 +97,7 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual seven** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual eight** (daily lean profile):
 
 - anchors: Codex `gpt-6-astra:high` + Cursor `claude-fable-5-1-thinking-high`
 - Codex seat: `gpt6astra=codex:gpt-6-astra:high`
@@ -106,9 +106,11 @@ Shipped `fleet.defaults` is the **author's usual seven** (daily lean profile):
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
 - no Cursor Sol seat; `gpt56sol` is out of both fleets
-- SiliconFlow daily seats: `dsv4flash` (V4-Flash-0731) + `glm53=siliconflow/zai-org/GLM-5.3:max`; `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, and `gpt56sol` are out of both fleets.
+- Daily DeepSeek seat: `dsv4flash=dsh:deepseek-flash:max` (dsh-TUI + official V4.1 Flash)
+- SiliconFlow daily seats: `glm53=siliconflow/zai-org/GLM-5.3:max` and `hy4prev=siliconflow/tencent/Hy4-preview:max`
+- `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, and `gpt56sol` are out of both fleets.
 
-Heavy / max-diversity **eight** lives in `fleet.full`:
+Heavy / max-diversity **nine** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
@@ -205,6 +207,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
+- Add `hy4prev=siliconflow/tencent/Hy4-preview:max` to both fleets; daily is usual eight, heavy is nine
 - Add `musespark=cursor:muse-spark-1.3-max` to both fleets; daily is usual seven, heavy is eight
 - Drop `cursor-agent-proxy`: preflight and start both use canonical `cursor-agent` (37890 via pane-export / list-models env)
 - Cursor seats: `herdr agent start --kind cursor` after exporting uppercase `HTTP(S)_PROXY=http://127.0.0.1:37890` in the pane (canonical `cursor-agent`; no `cursor-agent-proxy`)
@@ -229,7 +232,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 - Mixed-kind fleets: `name=kind:model` (e.g. Cursor via `cursor:…`); shared `fleet_lib.py` parse/preflight/start args
 - Cursor default seats: `fable51=cursor:claude-fable-5-1-thinking-high`, `k3max=cursor:kimi-k3-max`, `g38flash=cursor:gemini-3.8-flash-high`, and `musespark=cursor:muse-spark-1.3-max` with `--trust --force` (Run Everything)
 - Kind-aware prompt recovery (pi never re-pastes; non-pi enter-only nudge); hard-fail missing kind CLIs
-- Dual fleet profiles: **usual seven** `fleet.defaults` (daily) + **heavy eight** `fleet.full`
+- Dual fleet profiles: **usual eight** `fleet.defaults` (daily) + **heavy nine** `fleet.full`
 - No daily Go seat; heavy Go seat is `mimopro` only. No OpenRouter seat; no Antigravity seat; `oxalpha` / `hy3` / `glm52` / `k27code` / `dots3` / `g37flash` dropped
 - Unit tests: `tests/test_fleet_lib.py`
 - Exit the watchdog immediately with a partial result after every agent settles, preventing missing background completion notifications
