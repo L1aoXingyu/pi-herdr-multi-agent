@@ -72,20 +72,56 @@ fi
 
 log() { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*"; }
 
-dsh_pane_status() {
-  # TUI is not a herdr kind. Prompt text itself contains "VERDICT:" — only count
-  # a trailer after the last assistant marker (⏺).
-  local pane=$1
-  herdr pane read "$pane" --source recent-unwrapped --lines 120 2>/dev/null | python3 -c '
-import sys
-blob = sys.stdin.read()
-if "⏺" in blob and "VERDICT:" in blob.split("⏺")[-1]:
-    print("done")
-elif "dsh-TUI" in blob or "deepseek-flash" in blob or "❯" in blob:
-    print("working")
-else:
-    print("missing")
-'
+dsh_status() {
+  # TUI is not a herdr --kind. Prefer Herdr lifecycle by pane_id (native
+  # dsh-tui often has name=None). Composer/model chrome is not "working".
+  local pane=$1 herdr_name=$2
+  local list_file blob_file list_rc=1
+  list_file=$(mktemp)
+  blob_file=$(mktemp)
+  set +e
+  herdr agent list >"$list_file" 2>/dev/null
+  list_rc=$?
+  herdr pane read "$pane" --source recent-unwrapped --lines 250 >"$blob_file" 2>/dev/null
+  set -e
+  python3 -c '
+import json, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import fleet_lib as fl
+skill_dir, list_path, blob_path, pane, name, seen_path, list_ok = sys.argv[1:8]
+list_ok = list_ok == "0"
+agents = []
+if list_ok:
+    try:
+        payload = json.loads(Path(list_path).read_text() or "{}")
+        agents = (payload.get("result") or {}).get("agents") or []
+    except Exception:
+        list_ok = False
+try:
+    blob = Path(blob_path).read_text(errors="replace")
+except OSError:
+    blob = ""
+sp = Path(seen_path)
+seen = set()
+if sp.exists():
+    seen = {ln.strip() for ln in sp.read_text().splitlines() if ln.strip()}
+key = pane or name
+st, now = fl.dsh_runtime_status(
+    agents=agents,
+    list_ok=list_ok,
+    pane_id=pane,
+    herdr_name=name,
+    pane_blob=blob,
+    seen_working=key in seen,
+)
+if now and key:
+    seen.add(key)
+    sp.parent.mkdir(parents=True, exist_ok=True)
+    sp.write_text("\n".join(sorted(seen)) + "\n")
+print(st)
+' "$SKILL_DIR" "$list_file" "$blob_file" "$pane" "$herdr_name" "$OUTDIR/results/dsh-seen-working" "$list_rc"
+  rm -f "$list_file" "$blob_file"
 }
 
 agent_status() {
@@ -231,9 +267,10 @@ while true; do
       status_line+="$short=start_failed "
       continue
     fi
-    st=$(agent_status "$herdr_name")
     if [[ "$kind" == "dsh" ]]; then
-      st=$(dsh_pane_status "$pane")
+      st=$(dsh_status "$pane" "$herdr_name")
+    else
+      st=$(agent_status "$herdr_name")
     fi
     STATUSES+=("$st")
     status_line+="$short=$st "
@@ -303,7 +340,7 @@ for row in "${ROWS[@]}"; do
   st="start_failed"
   if [[ "$start_status" != "failed" ]]; then
     if [[ "$kind" == "dsh" ]]; then
-      st=$(dsh_pane_status "$pane")
+      st=$(dsh_status "$pane" "$herdr_name")
     else
       st=$(agent_status "$herdr_name")
     fi

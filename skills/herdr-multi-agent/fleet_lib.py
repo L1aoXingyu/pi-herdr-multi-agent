@@ -16,8 +16,8 @@ from pathlib import Path
 from typing import Iterable
 
 # Herdr agent kinds (from `herdr agent`) plus fleet-local `dsh`.
-# `dsh` is not `herdr agent start --kind`; launch.sh pane-runs headless
-# DeepSeek Harness and reports lifecycle with `pane report-agent`.
+# `dsh` is not `herdr agent start --kind`; launch.sh pane-runs
+# `dsh --profile dsh-tui`. The TUI reports `dsh-tui` (name often None).
 KNOWN_KINDS = frozenset(
     {
         "pi",
@@ -774,3 +774,88 @@ def nonpi_prompt_policy(
     if idle_ticks >= max_ticks:
         return "accept" if landed else "fail"
     return "wait"
+
+
+DSH_ASSISTANT_MARKERS = ("⏺", "●")  # darwin ring, other platforms' solid dot
+DSH_SPINNER_CHARS = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
+
+
+def herdr_row_for_dsh(
+    agents: Iterable[dict],
+    pane_id: str | None,
+    herdr_name: str | None,
+) -> dict | None:
+    """Prefer pane_id: native dsh-tui reports often have name=None."""
+    pane_id = (pane_id or "").strip()
+    herdr_name = (herdr_name or "").strip()
+    by_pane = None
+    by_name = None
+    for raw in agents or []:
+        if not isinstance(raw, dict):
+            continue
+        if pane_id and str(raw.get("pane_id") or "") == pane_id:
+            by_pane = raw
+        if herdr_name and str(raw.get("name") or "") == herdr_name:
+            by_name = raw
+    return by_pane or by_name
+
+
+def dsh_pane_is_done(blob: str | None) -> bool:
+    """True when VERDICT: follows the last assistant marker (not the prompt echo)."""
+    text = blob or ""
+    last = -1
+    for marker in DSH_ASSISTANT_MARKERS:
+        idx = text.rfind(marker)
+        if idx > last:
+            last = idx
+    if last < 0:
+        return False
+    return "VERDICT:" in text[last:]
+
+
+def dsh_pane_looks_alive(blob: str | None) -> bool:
+    """TUI chrome / spinner. Not a working signal when Herdr already has a row."""
+    text = blob or ""
+    if "dsh-TUI" in text or "deepseek-flash" in text or "❯" in text:
+        return True
+    return any(ch in text for ch in DSH_SPINNER_CHARS)
+
+
+def dsh_runtime_status(
+    *,
+    agents: Iterable[dict] | None,
+    list_ok: bool,
+    pane_id: str | None,
+    herdr_name: str | None,
+    pane_blob: str | None,
+    seen_working: bool,
+) -> tuple[str, bool]:
+    """Classify a dsh-TUI seat for the fleet watchdog.
+
+    Herdr pane lifecycle wins (match pane_id, then name). Composer ``❯`` and
+    the model footer are idle chrome — never "still working". Pre-turn idle
+    (never seen working, no assistant trailer) stays ``working`` so a prompt
+    echo of ``VERDICT:`` cannot finish the fleet. No Herdr row: pane fallback.
+    """
+    if not list_ok:
+        return "unknown", seen_working
+    row = herdr_row_for_dsh(agents or [], pane_id, herdr_name)
+    pane_done = dsh_pane_is_done(pane_blob)
+    if row is not None:
+        st = str(row.get("agent_status") or "unknown").strip().lower() or "unknown"
+        if st == "working":
+            return "working", True
+        if st == "done":
+            return "done", True
+        if st == "blocked":
+            return "blocked", seen_working or pane_done
+        if st == "idle":
+            if seen_working or pane_done:
+                return "idle", True
+            return "working", False
+        return st, seen_working
+    if pane_done:
+        return "done", True
+    if dsh_pane_looks_alive(pane_blob):
+        return "working", seen_working
+    return "missing", seen_working
