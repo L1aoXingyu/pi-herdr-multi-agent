@@ -239,5 +239,81 @@ class ExpandNameTests(unittest.TestCase):
         self.assertTrue(fl.NAME_RE.match(fl.expand_herdr_name("r", "gpt6astra")))
 
 
+IDLE_CHROME = """
+  Some analysis that scrolled the assistant marker off the 120-line window.
+
+    VERDICT: ship
+    RISKS: none
+    REQUIRED_FIXES: N/A
+    CONFIDENCE: high
+
+  ╭────────────────────────────╮
+  ❯                                                                                      
+  ╰────────────────────────────╯
+   deepseek-flash · max · dsh-tui-dry
+"""
+
+UNNAMED_IDLE = {
+    "agent": "dsh-tui",
+    "name": None,
+    "pane_id": "wK:pDSH",
+    "agent_status": "idle",
+}
+UNNAMED_WORKING = {**UNNAMED_IDLE, "agent_status": "working"}
+
+
+class DshRuntimeStatusTests(unittest.TestCase):
+    def _st(self, **kwargs):
+        defaults = dict(
+            agents=[UNNAMED_IDLE],
+            list_ok=True,
+            pane_id="wK:pDSH",
+            herdr_name="dshidle-dsv4flash",
+            pane_blob=IDLE_CHROME,
+            seen_working=False,
+        )
+        defaults.update(kwargs)
+        return fl.dsh_runtime_status(**defaults)
+
+    def test_chrome_is_not_working_when_herdr_idle_after_work(self):
+        st, seen = self._st(seen_working=True)
+        self.assertEqual(st, "idle")
+        self.assertTrue(seen)
+        self.assertFalse(fl.dsh_pane_is_done(IDLE_CHROME))
+
+    def test_pre_turn_idle_stays_working_without_marker(self):
+        st, seen = self._st(seen_working=False)
+        self.assertEqual(st, "working")
+        self.assertFalse(seen)
+
+    def test_idle_with_assistant_marker_is_terminal(self):
+        blob = "  ⏺ PONG\n\n    VERDICT: dryrun ok\n" + IDLE_CHROME
+        st, seen = self._st(pane_blob=blob, seen_working=False)
+        self.assertEqual(st, "idle")
+        self.assertTrue(seen)
+        self.assertTrue(fl.dsh_pane_is_done(blob))
+
+    def test_working_sets_seen_flag(self):
+        st, seen = self._st(agents=[UNNAMED_WORKING])
+        self.assertEqual(st, "working")
+        self.assertTrue(seen)
+
+    def test_list_failure_is_unknown(self):
+        st, seen = self._st(list_ok=False, seen_working=True)
+        self.assertEqual(st, "unknown")
+        self.assertTrue(seen)
+
+    def test_no_herdr_row_chrome_without_marker_is_working(self):
+        st, seen = self._st(agents=[], seen_working=False)
+        self.assertEqual(st, "working")
+        self.assertFalse(seen)
+
+    def test_match_pane_id_not_herdr_name(self):
+        row = fl.herdr_row_for_dsh(
+            [UNNAMED_IDLE], "wK:pDSH", "dshidle-dsv4flash"
+        )
+        self.assertIs(row, UNNAMED_IDLE)
+
+
 if __name__ == "__main__":
     unittest.main()

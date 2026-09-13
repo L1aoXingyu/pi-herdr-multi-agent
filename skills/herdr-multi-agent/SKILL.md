@@ -226,7 +226,7 @@ Official:
    "not an available shell". Fix: wait + `send-keys enter` + retry (up to ~60s).
 3. **Do not hardcode pane ids across sessions** — always record the map from this launch
    (`name → herdr_name → pane_id → tab_id`) under outdir.
-4. **Watchdog keys off agent `herdr_name`**, not pane id (pane id is fallback for raw read only).
+4. **Watchdog keys off agent `herdr_name`**, not pane id (pane id is fallback for raw read only). **dsh:** match by `pane_id` — native `dsh-tui` often has `name: None`. Trust Herdr `idle|done|blocked` after a `working` poll or when `VERDICT:` follows the last `⏺`/`●`. Never treat TUI chrome (`❯`, `deepseek-flash`) as working.
 5. **Prompt must force a machine-harvestable trailer** containing `VERDICT:` (or user override).
 6. **No-write by default** for review/investigation prompts unless the user explicitly wants writers.
    Short verify is allowed (tests, compilers, small reproducers, git, grep); scratch in `/tmp`.
@@ -447,7 +447,7 @@ If still stuck non-working without progress:
 Launch `watchdog.sh` with `run_terminal_command` and `background: true` (do not foreground-poll
 in the main turn; this harness has no `bg_run`). Watchdog must:
 
-1. Poll `herdr agent list` every ~20s by **`herdr_name`**.
+1. Poll `herdr agent list` every ~20s by **`herdr_name`** (dsh: by **`pane_id`**, because `dsh-tui` names are often empty).
 2. Terminal-ish statuses: `idle` | `done` | `blocked` | `missing` (after start failure skip).
    As soon as **all** names are terminal-ish, harvest and exit: zero when every successful agent
    has `VERDICT:`, non-zero partial otherwise. Never keep a settled fleet alive merely because a

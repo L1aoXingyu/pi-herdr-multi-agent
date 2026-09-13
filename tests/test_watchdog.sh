@@ -147,4 +147,63 @@ grep -q 'WATCHDOG_OK' "$TMP/transient.log"
 [[ $transient_elapsed -ge 1 ]] || { cat "$TMP/transient.log"; echo "list failure was treated as terminal" >&2; exit 1; }
 echo "OK: transient agent-list failure recovers on a later poll (${transient_elapsed}s)"
 
+# dsh-TUI: unnamed idle pane + chrome/VERDICT without ⏺ must finish after a
+# working poll (the old heuristic stayed working forever on ❯ / model footer).
+OUT_DSH="$TMP/out-dsh"
+COUNTER_DSH="$TMP/dsh-list-count"
+mkdir -p "$OUT_DSH/results" "$OUT_DSH/dsv4flash"
+cat >"$OUT_DSH/agents.json" <<'JSON'
+[{"name":"dsv4flash","herdr_name":"test-dsv4flash","pane_id":"p-dsh","start_status":"started","kind":"dsh"}]
+JSON
+cat >"$OUT_DSH/dsv4flash/verdict.md" <<'EOF'
+VERDICT: ship
+RISKS: none
+REQUIRED_FIXES: N/A
+CONFIDENCE: high
+EOF
+cat >"$TMP/bin/herdr" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "agent" && "${2:-}" == "list" ]]; then
+  count=0
+  [[ -f "$HERDR_COUNTER" ]] && count=$(cat "$HERDR_COUNTER")
+  count=$((count + 1))
+  echo "$count" >"$HERDR_COUNTER"
+  if [[ $count -eq 1 ]]; then
+    st=working
+  else
+    st=idle
+  fi
+  printf '{"result":{"agents":[{"agent":"dsh-tui","pane_id":"p-dsh","agent_status":"%s"}]}}\n' "$st"
+  exit 0
+fi
+if [[ "${1:-}" == "pane" && "${2:-}" == "read" ]]; then
+  cat <<'EOF'
+  Long assistant body; the ⏺ marker has scrolled off this window.
+
+    VERDICT: ship
+    RISKS: none
+    REQUIRED_FIXES: N/A
+    CONFIDENCE: high
+
+  ❯
+   deepseek-flash · max · dsh-tui-dry
+EOF
+  exit 0
+fi
+exit 1
+SH
+chmod +x "$TMP/bin/herdr"
+start=$SECONDS
+HERDR_COUNTER="$COUNTER_DSH" PATH="$TMP/bin:$PATH" "$BASH_BIN" "$WATCHDOG" \
+  --outdir "$OUT_DSH" --poll-sec 1 --stall-sec 30 --deadline-sec 30 >"$TMP/dsh.log" 2>&1
+dsh_rc=$?
+dsh_elapsed=$((SECONDS - start))
+[[ $dsh_rc -eq 0 ]] || { cat "$TMP/dsh.log"; echo "dsh idle fleet failed rc=$dsh_rc" >&2; exit 1; }
+[[ $dsh_elapsed -lt 5 ]] || { cat "$TMP/dsh.log"; echo "dsh watchdog hung ${dsh_elapsed}s" >&2; exit 1; }
+grep -q 'dsv4flash=working' "$TMP/dsh.log"
+grep -q 'dsv4flash=idle' "$TMP/dsh.log"
+grep -q 'ALL_AGENTS_FINISHED_WITH_VERDICT' "$TMP/dsh.log"
+grep -q 'WATCHDOG_OK' "$TMP/dsh.log"
+echo "OK: unnamed dsh-tui idle (no ⏺, chrome present) finishes promptly (${dsh_elapsed}s)"
+
 "$BASH_BIN" --version | head -n 1 | sed 's/^/OK: watchdog exercised with /'
