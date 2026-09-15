@@ -51,7 +51,7 @@ git checkout pi-2026-09-05
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
 | `fleet.defaults` | Author daily default — **usual five** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **heavy six** / max diversity |
+| `fleet.full` | Author heavy profile — **heavy eight** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -101,7 +101,7 @@ Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
 
 - anchors: Codex `gpt-6-astra:high` + Cursor `claude-fable-5-1-thinking-high`
 - Codex seat: `gpt6astra=codex:gpt-6-astra:high`
-- Cursor seat: `fable51=cursor:claude-fable-5-1-thinking-high` only (`k3max`, `g38flash`, `musespark` dropped)
+- Daily Cursor seat: `fable51=cursor:claude-fable-5-1-thinking-high` only; heavy adds `k3max`, `g38flash`, `musespark`
 - no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
@@ -110,7 +110,7 @@ Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
 - SiliconFlow daily seats: `glm53=siliconflow/zai-org/GLM-5.3:max` and `hy4prev=siliconflow/tencent/Hy4-preview:max`
 - `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, and `gpt56sol` are out of both fleets.
 
-Heavy / max-diversity **six** lives in `fleet.full`:
+Heavy / max-diversity **eight** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
@@ -207,7 +207,8 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
-- Drop `k3max`, `g38flash`, `musespark` from both fleets (Cursor usage); keep `fable51` only; daily is usual five, heavy is six
+- Drop `mimopro` from heavy; put `k3max`, `g38flash`, `musespark` in `fleet.full` only; daily is usual five, heavy is eight
+- Drop `k3max`, `g38flash`, `musespark` from daily (Cursor usage); keep daily `fable51` only
 - Add `hy4prev=siliconflow/tencent/Hy4-preview:max` to both fleets; daily is usual eight, heavy is nine
 - Add `musespark=cursor:muse-spark-1.3-max` to both fleets; daily is usual seven, heavy is eight
 - Drop `cursor-agent-proxy`: preflight and start both use canonical `cursor-agent` (37890 via pane-export / list-models env)
