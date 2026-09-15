@@ -39,8 +39,8 @@ ln -sfn "$(pwd)/pi-herdr-multi-agent/skills/herdr-multi-agent" ~/.pi/agent/skill
 | `launch.sh` | Create tab, split panes, serial `agent start`, parallel prompt fanout (`--serial-prompt` to disable) |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual eight** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **heavy nine** / max diversity |
+| `fleet.defaults` | Author daily default — **usual five** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **heavy six** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -86,11 +86,11 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual eight** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
 
 - anchors: Codex `gpt-6-astra:high` + Cursor `claude-fable-5-1-thinking-high`
 - Codex seat: `gpt6astra=codex:gpt-6-astra:high`
-- Cursor seats: `k3max=cursor:kimi-k3-max`, `g38flash=cursor:gemini-3.8-flash-high`, and `musespark=cursor:muse-spark-1.3-max`
+- Cursor seat: `fable51=cursor:claude-fable-5-1-thinking-high` only (`k3max`, `g38flash`, `musespark` dropped)
 - no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
@@ -99,7 +99,7 @@ Shipped `fleet.defaults` is the **author's usual eight** (daily lean profile):
 - SiliconFlow daily seats: `glm53=siliconflow/zai-org/GLM-5.3:max` and `hy4prev=siliconflow/tencent/Hy4-preview:max`
 - `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, and `gpt56sol` are out of both fleets.
 
-Heavy / max-diversity **nine** lives in `fleet.full`:
+Heavy / max-diversity **six** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
@@ -196,6 +196,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`main`)
 
+- Drop `k3max`, `g38flash`, `musespark` from both fleets (Cursor usage); keep `fable51` only; daily is usual five, heavy is six
 - Add `hy4prev=siliconflow/tencent/Hy4-preview:max` to both fleets; daily is usual eight, heavy is nine
 - Sync fleet/wait/harvest from `grok` (`a65a6b8`); Pi parent still uses `bg_run` + `watchdog.sh`
 - Daily usual eight: `gpt6astra` Codex high, `dsv4flash` dsh-TUI, `glm53`, `hy4prev`, `fable51`, `k3max`, `g38flash`, `musespark`; heavy nine adds `mimopro`
