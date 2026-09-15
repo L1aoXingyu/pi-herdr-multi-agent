@@ -1,25 +1,28 @@
-# Heavy / max-diversity fleet — author's full six.
+# Heavy / max-diversity fleet — author's full eight.
 # Use when quota allows or for high-stakes reviews:
 #   bash launch.sh ... --fleet-file "$SKILL_DIR/fleet.full"
 #
 # Daily default is fleet.defaults (usual five). Same line format.
 # Add-back remaining diversity on top of the five:
-#   mimopro
+#   k3max g38flash musespark
 # Daily Go seat is none (hy3 and Go glm53 dropped: OpenCode Go quota exhausted).
-# Heavy Go seat is mimopro only.
+# No heavy Go seat (mimopro dropped).
 # No OpenRouter seat (oxalpha dropped: stealth/ox-alpha unusable).
 # No Antigravity seat (g37flash dropped).
-# No extra Cursor seats (k3max, g38flash, musespark dropped: Cursor usage).
+# Daily Cursor seat: fable51 only.
+# Heavy extra Cursor seats: k3max, g38flash, musespark.
 # Daily DeepSeek seat: dsv4flash = dsh official deepseek-flash:max (V4.1 Flash).
 # SiliconFlow daily seats: glm53 (GLM-5.3 max) + hy4prev (Hy4-preview max).
-# oxalpha, hy3, glm52, k27code, dsv4pro, dsflash, dots3, g37flash, k3max, g38flash, and musespark are out of both fleets.
+# oxalpha, hy3, glm52, k27code, dsv4pro, dsflash, dots3, g37flash, gpt56sol, and mimopro are out of both fleets.
 # gpt6astra is official Codex CLI gpt-6-astra:high (cursor gpt-5.6-sol dropped).
-# Cursor seat is fable51 only; opencode-go k3 is out of both fleets.
+# Opencode-go k3 is out of both fleets.
 # qwen38max is out unless explicitly --agent'd.
 
 gpt6astra=codex:gpt-6-astra:high
-mimopro=opencode-go/mimo-v2.5-pro:max
 dsv4flash=dsh:deepseek-flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
 hy4prev=siliconflow/tencent/Hy4-preview:max
 fable51=cursor:claude-fable-5-1-thinking-high
+k3max=cursor:kimi-k3-max
+g38flash=cursor:gemini-3.8-flash-high
+musespark=cursor:muse-spark-1.3-max

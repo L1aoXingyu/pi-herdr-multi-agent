@@ -63,29 +63,29 @@ When the user does **not** specify models/names (or says "the usual seven" / "th
 | `hy4prev` | `pi` | `siliconflow/tencent/Hy4-preview:max` |
 | `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 
-### Full six models (heavy fleet)
+### Full eight models (heavy fleet)
 
-When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "fleet.full", pass:
+When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "heavy eight" / "fleet.full", pass:
 
 ```bash
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back opencode-go `mimopro` on top of the five.
-Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). Heavy Go seat is `mimopro` only.
+Adds back Cursor `k3max`, `g38flash`, `musespark` on top of the five.
+Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). No heavy Go seat (`mimopro` dropped).
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
 Daily DeepSeek seat is `dsv4flash=dsh:deepseek-flash:max` (DeepSeek Harness + official V4.1 Flash). SiliconFlow daily seats are `glm53` (`zai-org/GLM-5.3:max`) and `hy4prev` (`tencent/Hy4-preview:max`).
 No Antigravity seat (`g37flash` dropped).
-Cursor seat is `fable51` only (`k3max`, `g38flash`, `musespark` dropped: Cursor usage).
-`oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, `g37flash`, `k3max`, `g38flash`, and `musespark` are out of both fleets.
+Daily Cursor seat is `fable51` only. Heavy extra Cursor seats are `k3max`, `g38flash`, `musespark`.
+`oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, `g37flash`, `gpt56sol`, and `mimopro` are out of both fleets.
 Opencode-go `k3` is out of both fleets.
-Phrase map: **usual five = defaults** (legacy: usual eight / seven / six / four / nine); **heavy six = fleet.full** (legacy: usual nine / eight / seven / six / eleven / ten).
+Phrase map: **usual five = defaults** (legacy: usual eight / seven / six / four / nine); **heavy eight = fleet.full** (legacy: usual nine / eight / seven / six / eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`); fleet-local `dsh:deepseek-flash:max` starts `dsh --profile dsh-tui` in the pane (not `herdr agent start --kind dsh`)
 
-**Cursor dependency / security:** default fleet includes one cursor agent (`fable51`). Requires
+**Cursor dependency / security:** default fleet includes one cursor agent (`fable51`). Heavy fleet adds `k3max`, `g38flash`, `musespark`. Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
 uppercase `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`=`http://127.0.0.1:37890` in that pane (Cursor/Node
 ignores lowercase `http_proxy`), then `herdr agent start --kind cursor`. Launch uses `--trust --force`
@@ -258,7 +258,7 @@ bash "$SKILL_DIR/launch.sh" \
   # optional --agent hy4prev=siliconflow/tencent/Hy4-preview:max
   # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
   # optional --agent dsv4flash=dsh:deepseek-flash:max
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy six / fleet.full
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy eight / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --serial-prompt  => wait for each prompt accept before the next
