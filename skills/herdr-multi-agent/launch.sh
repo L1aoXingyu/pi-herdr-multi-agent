@@ -33,7 +33,7 @@ Spec formats:
                                    # e.g. fable51=cursor:claude-fable-5-1-thinking-high
                                    #      g38flash=cursor:gemini-3.8-flash-high
                                    #      musespark=cursor:muse-spark-1.3-max
-                                   #      gpt6astra=codex:gpt-6-astra:high
+                                   #      grok46=cursor:cursor-grok-4.6-xhigh-fast
                                    #      dsv4flash=dsh:deepseek-flash:max
                                    #      glm53=siliconflow/zai-org/GLM-5.3:max
                                    #      hy4prev=siliconflow/tencent/Hy4-preview:max

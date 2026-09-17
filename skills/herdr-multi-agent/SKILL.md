@@ -5,7 +5,7 @@ description: Launch a multi-model Herdr review fleet from Pi, wait with a bg-tas
 
 # /herdr-multi-agent — Multi-model Herdr fleet from Pi
 
-Parent is **Pi**. Behavior tracks the grok branch (Codex + dsh-TUI + Cursor seats, landed
+Parent is **Pi**. Behavior tracks the grok branch (dsh-TUI + Cursor seats, landed
 detection, parallel prompt). Fleet panes are whatever `herdr agent --kind` starts, plus
 fleet-local `dsh` (not a herdr kind).
 
@@ -57,7 +57,7 @@ When the user does **not** specify models/names (or says "the usual seven" / "th
 
 | Name | Kind | Model |
 |---|---|---|
-| `gpt6astra` | `codex` | `gpt-6-astra` reasoning `high` (official Codex CLI) |
+| `grok46` | `cursor` | `cursor-grok-4.6-xhigh-fast` (via cursor-cli `agent`/`cursor-agent`) |
 | `dsv4flash` | `dsh` | official `deepseek-flash` reasoning `max` (dsh-TUI in a Herdr pane; V4.1 Flash) |
 | `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `hy4prev` | `pi` | `siliconflow/tencent/Hy4-preview:max` |
@@ -76,8 +76,8 @@ Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). 
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
 Daily DeepSeek seat is `dsv4flash=dsh:deepseek-flash:max` (DeepSeek Harness + official V4.1 Flash). SiliconFlow daily seats are `glm53` (`zai-org/GLM-5.3:max`) and `hy4prev` (`tencent/Hy4-preview:max`).
 No Antigravity seat (`g37flash` dropped).
-Daily Cursor seat is `fable51` only. Heavy extra Cursor seats are `k3max`, `g38flash`, `musespark`.
-`oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, `g37flash`, `gpt56sol`, and `mimopro` are out of both fleets.
+Daily Cursor seats are `grok46` and `fable51`. Heavy extra Cursor seats are `k3max`, `g38flash`, `musespark`.
+`oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, `g37flash`, `gpt56sol`, `gpt6astra`, and `mimopro` are out of both fleets.
 Opencode-go `k3` is out of both fleets.
 Phrase map: **usual five = defaults** (legacy: usual eight / seven / six / four / nine); **heavy eight = fleet.full** (legacy: usual nine / eight / seven / six / eleven / ten).
 
@@ -85,7 +85,7 @@ Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`); fleet-local `dsh:deepseek-flash:max` starts `dsh --profile dsh-tui` in the pane (not `herdr agent start --kind dsh`)
 
-**Cursor dependency / security:** default fleet includes one cursor agent (`fable51`). Heavy fleet adds `k3max`, `g38flash`, `musespark`. Requires
+**Cursor dependency / security:** default fleet includes two cursor agents (`grok46`, `fable51`). Heavy fleet adds `k3max`, `g38flash`, `musespark`. Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
 uppercase `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`=`http://127.0.0.1:37890` in that pane (Cursor/Node
 ignores lowercase `http_proxy`), then `herdr agent start --kind cursor`. Launch uses `--trust --force`
@@ -94,14 +94,13 @@ as unsupervised pi reviewers with full tools — intentional for unattended mixe
 Missing cursor CLI when the fleet lists cursor entries fails preflight hard (unless
 `--skip-model-preflight`).
 
-**Codex dependency / security:** default fleet includes `gpt6astra=codex:gpt-6-astra:high`. Requires
-`codex` on PATH and a ChatGPT Codex login (`codex login status`). Same 37890 proxy export as
+**Codex dependency / security:** Codex is **not** in the default or heavy fleet (`gpt6astra` dropped 2026-09-16). Optional `--agent name=codex:model:effort` still works: requires `codex` on PATH and a ChatGPT Codex login (`codex login status`). Same 37890 proxy export as
 cursor: once, while the pane is still a shell (a start retry must not pane-run export — that
-pastes `export HTTPS_PROXY=…` into the TUI). Launch passes `--model gpt-6-astra`, `-c model_reasoning_effort="high"`,
+pastes `export HTTPS_PROXY=…` into the TUI). Launch passes `--model`, `-c model_reasoning_effort=...`,
 `--dangerously-bypass-approvals-and-sandbox`, and `--dangerously-bypass-hook-trust`
 (unattended; same blast radius as cursor `--force`).
-Missing Codex CLI or login fails preflight hard (unless `--skip-model-preflight`).
-`gpt56sol` / cursor `gpt-5.6-sol-xhigh` is out of both fleets.
+Missing Codex CLI or login fails preflight hard only when the fleet lists codex entries (unless `--skip-model-preflight`).
+`gpt6astra` / official Codex `gpt-6-astra` and `gpt56sol` / cursor `gpt-5.6-sol-xhigh` are out of both fleets.
 
 **DeepSeek Harness (`dsh`) dependency:** default fleet includes
 `dsv4flash=dsh:deepseek-flash:max`. Requires `dsh` 0.1.5+ on PATH (official
@@ -113,7 +112,7 @@ or the official key fails preflight hard (unless `--skip-model-preflight`).
 
 Override names/models when the user specifies others. Keep **stable short agent names**
 that stay unique after namespacing (see Name rules). If a default name collides with a live agent,
-prefix once (e.g. `r2-gpt6astra`) rather than reusing the live name.
+prefix once (e.g. `r2-grok46`) rather than reusing the live name.
 
 ## Herdr CLI semantics (absorb from official skill)
 
@@ -253,7 +252,7 @@ bash "$SKILL_DIR/launch.sh" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
   # omit --agent => fleet.defaults (usual five); optional --agent name=model ...
-  # optional --agent gpt6astra=codex:gpt-6-astra:high  (mixed kind)
+  # optional --agent grok46=cursor:cursor-grok-4.6-xhigh-fast  (mixed kind)
   # optional --agent glm53=siliconflow/zai-org/GLM-5.3:max
   # optional --agent hy4prev=siliconflow/tencent/Hy4-preview:max
   # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
@@ -397,12 +396,12 @@ Notes:
 
 ```json
 [{
-  "name": "gpt6astra",
-  "herdr_name": "my-review-gpt6astra",
+  "name": "grok46",
+  "herdr_name": "my-review-grok46",
   "pane_id": "w5:pX",
   "tab_id": "w5:t9",
-  "model": "gpt-6-astra:high",
-  "kind": "codex",
+  "model": "cursor-grok-4.6-xhigh-fast",
+  "kind": "cursor",
   "start_status": "started"
 },{
   "name": "fable51",

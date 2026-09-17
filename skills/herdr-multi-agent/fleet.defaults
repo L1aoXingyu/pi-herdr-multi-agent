@@ -43,21 +43,22 @@
 #            2026-09-10 dsv4flash: DeepSeek Harness official deepseek-flash (V4.1); drop SiliconFlow V4-Flash
 #            2026-09-12 hy4prev: siliconflow tencent/Hy4-preview:max
 #            2026-09-14 drop k3max + g38flash + musespark from daily: Cursor usage; keep fable51 only
-#            2026-09-15 heavy: drop mimopro; put k3max + g38flash + musespark in fleet.full only):
-#   - Keep anchors: Codex gpt-6-astra high + cursor fable 5.1 thinking-high
-#   - Codex seat: gpt6astra=codex:gpt-6-astra:high
-#   - Daily Cursor seat: fable51 only
+#            2026-09-15 heavy: drop mimopro; put k3max + g38flash + musespark in fleet.full only
+#            2026-09-16 drop gpt6astra; add grok46=cursor:cursor-grok-4.6-xhigh-fast):
+#   - Keep anchors: cursor grok 4.6 xhigh-fast + cursor fable 5.1 thinking-high
+#   - No Codex seat; gpt6astra is out of both fleets
+#   - Daily Cursor seats: grok46 + fable51
 #   - Heavy extra Cursor seats: k3max + g38flash + musespark (not in daily)
 #   - No Antigravity seat; g37flash is out of both fleets
 #   - No opencode-go seat; hy3, Go glm53, and mimopro are out of both fleets
 #   - No OpenRouter seat; oxalpha is out of both fleets
 #   - Daily DeepSeek seat: dsv4flash = dsh official deepseek-flash:max (V4.1 Flash)
 #   - SiliconFlow daily seats: glm53 (GLM-5.3 max) + hy4prev (Hy4-preview max)
-#   - oxalpha, hy3, glm52, k27code, dsv4pro, dots3, g37flash, gpt56sol, and mimopro are out of both fleets
+#   - oxalpha, hy3, glm52, k27code, dsv4pro, dots3, g37flash, gpt56sol, gpt6astra, and mimopro are out of both fleets
 #   - Drop opencode-go k3 entirely; qwen38max is out
 
-# Codex CLI via herdr agent start --kind codex; --dangerously-bypass-approvals-and-sandbox
-gpt6astra=codex:gpt-6-astra:high
+# Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force
+grok46=cursor:cursor-grok-4.6-xhigh-fast
 # dsh-TUI in a Herdr pane (not herdr --kind); official API deepseek-flash = V4.1 Flash
 dsv4flash=dsh:deepseek-flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
