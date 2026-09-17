@@ -17,7 +17,7 @@ Prefer `spawn_subagent` when you only need the final text.
 - [Grok Build](https://grok.com) CLI (parent orchestrator)
 - [Herdr](https://github.com/herdrdev/herdr) **≥ 0.7.5** (`herdr` on `PATH`, server running) — tested on 0.8.x
 - `python3` and `bash` on `PATH` (scripts avoid bash-4-only `mapfile` / GNU `readlink -f`)
-- Fleet pane kinds (default: Codex + Pi + Cursor) already logged in on this machine
+- Fleet pane kinds (default: Pi + Cursor + dsh-TUI) already logged in on this machine
 
 ## Install (Grok)
 
@@ -99,16 +99,16 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
 
-- anchors: Codex `gpt-6-astra:high` + Cursor `claude-fable-5-1-thinking-high`
-- Codex seat: `gpt6astra=codex:gpt-6-astra:high`
-- Daily Cursor seat: `fable51=cursor:claude-fable-5-1-thinking-high` only; heavy adds `k3max`, `g38flash`, `musespark`
+- anchors: Cursor `cursor-grok-4.6-xhigh-fast` + Cursor `claude-fable-5-1-thinking-high`
+- No Codex seat; `gpt6astra` is out of both fleets
+- Daily Cursor seats: `grok46=cursor:cursor-grok-4.6-xhigh-fast` and `fable51=cursor:claude-fable-5-1-thinking-high`; heavy adds `k3max`, `g38flash`, `musespark`
 - no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
-- no Cursor Sol seat; `gpt56sol` is out of both fleets
+- no Codex / Cursor Sol seats; `gpt6astra` and `gpt56sol` are out of both fleets
 - Daily DeepSeek seat: `dsv4flash=dsh:deepseek-flash:max` (dsh-TUI + official V4.1 Flash)
 - SiliconFlow daily seats: `glm53=siliconflow/zai-org/GLM-5.3:max` and `hy4prev=siliconflow/tencent/Hy4-preview:max`
-- `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, and `gpt56sol` are out of both fleets.
+- `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, `gpt56sol`, and `gpt6astra` are out of both fleets.
 
 Heavy / max-diversity **eight** lives in `fleet.full`:
 
@@ -117,7 +117,7 @@ bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
 Both profiles **fail preflight** on machines without the required providers/CLIs
-(missing `pi`, `codex`, or `agent`/`cursor-agent` when listed is a hard error, not a silent skip).
+(missing `pi` or `agent`/`cursor-agent` when listed is a hard error, not a silent skip; Codex only if a `codex:` row is listed).
 For third-party use:
 
 1. Copy `skills/herdr-multi-agent/fleet.example` → your own file and edit, or
@@ -136,7 +136,7 @@ Mixed-kind example:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... \
-  --agent gpt6astra=codex:gpt-6-astra:high \
+  --agent grok46=cursor:cursor-grok-4.6-xhigh-fast \
   --agent fable51=cursor:claude-fable-5-1-thinking-high
 ```
 
@@ -207,6 +207,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
+- Drop `gpt6astra` (Codex); add daily/heavy `grok46=cursor:cursor-grok-4.6-xhigh-fast`; daily still five, heavy still eight
 - Drop `mimopro` from heavy; put `k3max`, `g38flash`, `musespark` in `fleet.full` only; daily is usual five, heavy is eight
 - Drop `k3max`, `g38flash`, `musespark` from daily (Cursor usage); keep daily `fable51` only
 - Add `hy4prev=siliconflow/tencent/Hy4-preview:max` to both fleets; daily is usual eight, heavy is nine
