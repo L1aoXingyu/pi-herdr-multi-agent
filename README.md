@@ -50,7 +50,7 @@ git checkout pi-2026-09-05
 | `launch.sh` | Create tab, split panes, serial `agent start`, parallel prompt fanout (`--serial-prompt` to disable) |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual five** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.defaults` | Author daily default — **usual four** (`name=provider/model[:thinking]` or `name=kind:model`) |
 | `fleet.full` | Author heavy profile — **heavy eight** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
@@ -97,11 +97,11 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual four** (daily lean profile):
 
-- anchors: Cursor `cursor-grok-4.6-xhigh-fast` + Cursor `claude-fable-5-1-thinking-high`
+- daily anchor: Cursor `cursor-grok-4.6-xhigh-fast`; heavy still includes Cursor `claude-fable-5-1-thinking-high`
 - No Codex seat; `gpt6astra` is out of both fleets
-- Daily Cursor seats: `grok46=cursor:cursor-grok-4.6-xhigh-fast` and `fable51=cursor:claude-fable-5-1-thinking-high`; heavy adds `k3max`, `g38flash`, `musespark`
+- Daily Cursor seat: `grok46=cursor:cursor-grok-4.6-xhigh-fast`; heavy adds `fable51`, `k3max`, `g38flash`, `musespark`
 - no daily opencode-go seat; `hy3` and OpenCode Go `glm53` are out of both fleets (quota exhausted)
 - no OpenRouter seat; `oxalpha` is out of both fleets (stealth/ox-alpha unusable)
 - no Antigravity seat; `g37flash` is out of both fleets
@@ -207,6 +207,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`grok` branch)
 
+- Move `fable51` from daily to `fleet.full` only; daily is usual four, heavy still eight
 - Drop `gpt6astra` (Codex); add daily/heavy `grok46=cursor:cursor-grok-4.6-xhigh-fast`; daily still five, heavy still eight
 - Drop `mimopro` from heavy; put `k3max`, `g38flash`, `musespark` in `fleet.full` only; daily is usual five, heavy is eight
 - Drop `k3max`, `g38flash`, `musespark` from daily (Cursor usage); keep daily `fable51` only

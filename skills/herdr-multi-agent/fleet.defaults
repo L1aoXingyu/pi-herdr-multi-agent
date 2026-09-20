@@ -1,4 +1,4 @@
-# Default multi-model fleet for herdr-multi-agent — author's usual five (daily).
+# Default multi-model fleet for herdr-multi-agent — author's usual four (daily).
 #
 # Heavy / max-diversity list: see fleet.full (pass --fleet-file $SKILL_DIR/fleet.full).
 #
@@ -44,11 +44,12 @@
 #            2026-09-12 hy4prev: siliconflow tencent/Hy4-preview:max
 #            2026-09-14 drop k3max + g38flash + musespark from daily: Cursor usage; keep fable51 only
 #            2026-09-15 heavy: drop mimopro; put k3max + g38flash + musespark in fleet.full only
-#            2026-09-16 drop gpt6astra; add grok46=cursor:cursor-grok-4.6-xhigh-fast):
-#   - Keep anchors: cursor grok 4.6 xhigh-fast + cursor fable 5.1 thinking-high
+#            2026-09-16 drop gpt6astra; add grok46=cursor:cursor-grok-4.6-xhigh-fast
+#            2026-09-20 move fable51 to fleet.full only):
+#   - Keep daily anchor: cursor grok 4.6 xhigh-fast
 #   - No Codex seat; gpt6astra is out of both fleets
-#   - Daily Cursor seats: grok46 + fable51
-#   - Heavy extra Cursor seats: k3max + g38flash + musespark (not in daily)
+#   - Daily Cursor seat: grok46 only
+#   - Heavy extra Cursor seats: fable51 + k3max + g38flash + musespark (not in daily)
 #   - No Antigravity seat; g37flash is out of both fleets
 #   - No opencode-go seat; hy3, Go glm53, and mimopro are out of both fleets
 #   - No OpenRouter seat; oxalpha is out of both fleets
@@ -63,5 +64,3 @@ grok46=cursor:cursor-grok-4.6-xhigh-fast
 dsv4flash=dsh:deepseek-flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max
 hy4prev=siliconflow/tencent/Hy4-preview:max
-# Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force
-fable51=cursor:claude-fable-5-1-thinking-high
