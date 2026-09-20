@@ -44,11 +44,11 @@ at `~/.grok/skills/herdr-multi-agent`.
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual five below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual four below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual five models (default / daily fleet)
+### Usual four models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
@@ -61,7 +61,6 @@ When the user does **not** specify models/names (or says "the usual seven" / "th
 | `dsv4flash` | `dsh` | official `deepseek-flash` reasoning `max` (dsh-TUI in a Herdr pane; V4.1 Flash) |
 | `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `hy4prev` | `pi` | `siliconflow/tencent/Hy4-preview:max` |
-| `fable51` | `cursor` | `claude-fable-5-1-thinking-high` (via cursor-cli `agent`/`cursor-agent`) |
 
 ### Full eight models (heavy fleet)
 
@@ -71,21 +70,21 @@ When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy 
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back Cursor `k3max`, `g38flash`, `musespark` on top of the five.
+Adds back Cursor `fable51`, `k3max`, `g38flash`, `musespark` on top of the four.
 Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). No heavy Go seat (`mimopro` dropped).
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
 Daily DeepSeek seat is `dsv4flash=dsh:deepseek-flash:max` (DeepSeek Harness + official V4.1 Flash). SiliconFlow daily seats are `glm53` (`zai-org/GLM-5.3:max`) and `hy4prev` (`tencent/Hy4-preview:max`).
 No Antigravity seat (`g37flash` dropped).
-Daily Cursor seats are `grok46` and `fable51`. Heavy extra Cursor seats are `k3max`, `g38flash`, `musespark`.
+Daily Cursor seat is `grok46` only. Heavy extra Cursor seats are `fable51`, `k3max`, `g38flash`, `musespark`.
 `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, `g37flash`, `gpt56sol`, `gpt6astra`, and `mimopro` are out of both fleets.
 Opencode-go `k3` is out of both fleets.
-Phrase map: **usual five = defaults** (legacy: usual eight / seven / six / four / nine); **heavy eight = fleet.full** (legacy: usual nine / eight / seven / six / eleven / ten).
+Phrase map: **usual four = defaults** (legacy: usual five / eight / seven / six / nine); **heavy eight = fleet.full** (legacy: usual nine / eight / seven / six / eleven / ten).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
 - `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`); fleet-local `dsh:deepseek-flash:max` starts `dsh --profile dsh-tui` in the pane (not `herdr agent start --kind dsh`)
 
-**Cursor dependency / security:** default fleet includes two cursor agents (`grok46`, `fable51`). Heavy fleet adds `k3max`, `g38flash`, `musespark`. Requires
+**Cursor dependency / security:** default fleet includes one cursor agent (`grok46`). Heavy fleet adds `fable51`, `k3max`, `g38flash`, `musespark`. Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
 uppercase `HTTPS_PROXY`/`HTTP_PROXY`/`ALL_PROXY`=`http://127.0.0.1:37890` in that pane (Cursor/Node
 ignores lowercase `http_proxy`), then `herdr agent start --kind cursor`. Launch uses `--trust --force`
@@ -251,7 +250,7 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual five); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual four); optional --agent name=model ...
   # optional --agent grok46=cursor:cursor-grok-4.6-xhigh-fast  (mixed kind)
   # optional --agent glm53=siliconflow/zai-org/GLM-5.3:max
   # optional --agent hy4prev=siliconflow/tencent/Hy4-preview:max
