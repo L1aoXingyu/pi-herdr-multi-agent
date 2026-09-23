@@ -53,6 +53,9 @@ NAME_RE = re.compile(r"^[a-z][a-z0-9_-]{0,31}$")
 CODEX_REASONING_EFFORTS = frozenset(
     {"none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"}
 )
+# Claude Code --effort. Opus 5.5's catalog default is medium, and this Mac's
+# modelSettings pin claude-opus-5-5 to medium, so a fleet seat must pass :high.
+CLAUDE_EFFORTS = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 
 def split_model_effort(model: str) -> tuple[str, str | None]:
@@ -65,6 +68,35 @@ def split_model_effort(model: str) -> tuple[str, str | None]:
     if effort in CODEX_REASONING_EFFORTS and base.strip():
         return base.strip(), effort
     return raw, None
+
+
+def split_claude_model_effort(model: str) -> tuple[str, str | None]:
+    """Split ``id:effort`` only for Claude Code effort levels.
+
+    ``ultra`` / ``none`` stay inside the model id so preflight rejects them
+    instead of sending ``--effort ultra``.
+    """
+    raw = (model or "").strip()
+    if ":" not in raw:
+        return raw, None
+    base, maybe = raw.rsplit(":", 1)
+    effort = maybe.strip().lower()
+    if effort in CLAUDE_EFFORTS and base.strip():
+        return base.strip(), effort
+    return raw, None
+
+
+def claude_spec_error(model: str, catalog_ids: set[str] | None) -> str | None:
+    """Return a preflight error for one Claude Code model spec, or None."""
+    raw = (model or "").strip()
+    mid, effort = split_claude_model_effort(raw)
+    if ":" in raw and effort is None:
+        return "effort must be low|medium|high|xhigh|max"
+    if not mid:
+        return "empty model"
+    if catalog_ids is not None and mid.lower() not in catalog_ids:
+        return "not in claude model catalog"
+    return None
 
 
 class FleetError(ValueError):
@@ -398,6 +430,54 @@ exit "$rc"
     script_path.chmod(0o755)
 
 
+def claude_catalog_ids() -> set[str] | None:
+    """Model ids from the newest Claude Code ``*-cc.json`` catalog, or None.
+
+    None means "no cache" — do not fail the id. A present cache that lacks the
+    id is a preflight miss (aliases like ``opus`` are not seats; use the full id).
+    """
+    root = Path.home() / ".claude" / "cache" / "model-catalog"
+    if not root.is_dir():
+        return None
+    files = sorted(root.glob("*-cc.json"), key=lambda p: p.stat().st_mtime, reverse=True)
+    if not files:
+        return None
+    try:
+        data = json.loads(files[0].read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    models = ((data.get("catalog") or {}).get("config") or {}).get("models") or []
+    ids: set[str] = set()
+    if isinstance(models, list):
+        for item in models:
+            if isinstance(item, dict) and item.get("id"):
+                ids.add(str(item["id"]).lower())
+    return ids or None
+
+
+def claude_logged_in() -> tuple[bool, str]:
+    """True when ``claude auth status --json`` says loggedIn. No account details."""
+    try:
+        p = subprocess.run(
+            ["claude", "auth", "status", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except Exception as e:  # noqa: BLE001
+        return False, f"claude auth status failed ({type(e).__name__})"
+    try:
+        data = json.loads(p.stdout or "")
+    except json.JSONDecodeError:
+        return False, "claude auth status not json"
+    if isinstance(data, dict) and data.get("loggedIn") is True:
+        method = data.get("authMethod")
+        if isinstance(method, str) and method:
+            return True, method
+        return True, "logged-in"
+    return False, "not logged in"
+
+
 def _codex_login_ok() -> tuple[bool, str]:
     """True when `codex login status` reports a session (stdout or stderr)."""
     try:
@@ -573,6 +653,27 @@ def preflight_specs(
                         + ", ".join(sorted(DSH_OFFICIAL_MODELS))
                         + ")"
                     )
+        elif kind == "claude":
+            # GPU nodes have no Claude Code. Drop the seat; do not abort the fleet.
+            # A present binary must be logged in and (when the catalog cache exists)
+            # use a real model id. Opus 5.5 effort is not inferred from settings.
+            if not shutil.which("claude"):
+                skipped.append(kind)
+                continue
+            ok, detail = claude_logged_in()
+            if not ok:
+                if hard_fail_missing_cli:
+                    raise FleetError(
+                        f"claude not logged in ({detail}); run `claude auth login` "
+                        "or pass --skip-model-preflight"
+                    )
+                skipped.append(kind)
+                continue
+            catalog = claude_catalog_ids()
+            for short, model in items:
+                err = claude_spec_error(model, catalog)
+                if err:
+                    missing.append(f"{short}=claude:{model} ({err})")
         else:
             # No generic list-models contract for other kinds yet.
             skipped.append(kind)
@@ -604,6 +705,16 @@ def start_native_args(kind: str, model: str, *, session_dir: str, herdr_name: st
         return args
     if kind == "dsh":
         return []
+    if kind == "claude":
+        # herdr agent start --kind claude. --effort overrides the saved
+        # per-model effort (Opus 5.5 default / this Mac's modelSettings = medium).
+        model_id, effort = split_claude_model_effort(model)
+        args = ["--model", model_id]
+        if effort:
+            args.extend(["--effort", effort])
+        # unattended: same blast radius as cursor --force
+        args.append("--dangerously-skip-permissions")
+        return args
     return ["--model", model]
 
 
@@ -648,6 +759,9 @@ COLD_TITLES = frozenset(
         "codex cli",
         "codex-cli",
         "openai codex",
+        "claude",
+        "claude code",
+        "claude-code",
     }
 )
 COLD_TITLE_HEADS = frozenset(
@@ -660,6 +774,7 @@ COLD_TITLE_HEADS = frozenset(
         "agy",
         "antigravity",
         "openai",
+        "claude",
     }
 )
 PASTED_TEXT_RE = re.compile(r"\[\s*Pasted text #\d+", re.I)
