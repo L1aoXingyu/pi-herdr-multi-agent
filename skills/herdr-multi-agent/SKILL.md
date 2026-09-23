@@ -44,11 +44,11 @@ at `~/.grok/skills/herdr-multi-agent`.
 | Outdir | `/tmp/herdr-multi-<slug>/` |
 | Verdict marker | `VERDICT:` |
 | Watchdog deadline | 40 minutes |
-| Models | **`fleet.defaults` (usual four below)** when the user does not name models |
+| Models | **`fleet.defaults` (usual five below)** when the user does not name models |
 | Auto-close review tab | **on** after main-agent synthesis (see Cleanup) |
 | Agent kind | per-agent from fleet (`pi` default; `cursor:` etc. for mixed fleets). Global `--kind` is the default only. Discover kinds via `herdr agent`. |
 
-### Usual four models (default / daily fleet)
+### Usual five models (default / daily fleet)
 
 Source of truth: `$SKILL_DIR/fleet.defaults` (edit locally or pass `--fleet-file`).
 
@@ -58,31 +58,32 @@ When the user does **not** specify models/names (or says "the usual seven" / "th
 | Name | Kind | Model |
 |---|---|---|
 | `grok46` | `cursor` | `cursor-grok-4.6-xhigh-fast` (via cursor-cli `agent`/`cursor-agent`) |
+| `opus55` | `claude` | Claude Code `claude-opus-5-5` effort `high` (`--kind claude`, not Cursor) |
 | `dsv4flash` | `dsh` | official `deepseek-flash` reasoning `max` (dsh-TUI in a Herdr pane; V4.1 Flash) |
 | `glm53` | `pi` | `siliconflow/zai-org/GLM-5.3:max` |
 | `hy4prev` | `pi` | `siliconflow/tencent/Hy4-preview:max` |
 
-### Full eight models (heavy fleet)
+### Full nine models (heavy fleet)
 
-When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "heavy eight" / "fleet.full", pass:
+When the user says "the usual eleven" / "the usual ten" / "full fleet" / "heavy fleet" / "heavy nine" / "heavy eight" / "fleet.full", pass:
 
 ```bash
 --fleet-file "$SKILL_DIR/fleet.full"
 ```
 
-Adds back Cursor `fable51`, `k3max`, `g38flash`, `musespark` on top of the four.
+Adds back Cursor `fable51`, `k3max`, `g38flash`, `musespark` on top of the five.
 Daily Go seat is none (`hy3` and OpenCode Go `glm53` dropped: quota exhausted). No heavy Go seat (`mimopro` dropped).
 No OpenRouter seat (`oxalpha` dropped: stealth/ox-alpha unusable).
 Daily DeepSeek seat is `dsv4flash=dsh:deepseek-flash:max` (DeepSeek Harness + official V4.1 Flash). SiliconFlow daily seats are `glm53` (`zai-org/GLM-5.3:max`) and `hy4prev` (`tencent/Hy4-preview:max`).
 No Antigravity seat (`g37flash` dropped).
-Daily Cursor seat is `grok46` only. Heavy extra Cursor seats are `fable51`, `k3max`, `g38flash`, `musespark`.
+Daily Claude Code seat is `opus55=claude:claude-opus-5-5:high`. Daily Cursor seat is `grok46` only. Heavy extra Cursor seats are `fable51`, `k3max`, `g38flash`, `musespark`.
 `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dsflash`, `dots3`, `g37flash`, `gpt56sol`, `gpt6astra`, and `mimopro` are out of both fleets.
 Opencode-go `k3` is out of both fleets.
-Phrase map: **usual four = defaults** (legacy: usual five / eight / seven / six / nine); **heavy eight = fleet.full** (legacy: usual nine / eight / seven / six / eleven / ten).
+Phrase map: **usual five = defaults** (legacy: usual four / eight / seven / six / nine); **heavy nine = fleet.full** (legacy: heavy eight / usual eleven / ten / nine / eight / seven / six).
 
 Fleet line formats:
 - `name=provider/model[:thinking]` → kind `pi`
-- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`); fleet-local `dsh:deepseek-flash:max` starts `dsh --profile dsh-tui` in the pane (not `herdr agent start --kind dsh`)
+- `name=kind:model` → herdr kind prefix when `kind` is a known agent kind (e.g. `fable51=cursor:claude-fable-5-1-thinking-high`, `opus55=claude:claude-opus-5-5:high`); fleet-local `dsh:deepseek-flash:max` starts `dsh --profile dsh-tui` in the pane (not `herdr agent start --kind dsh`)
 
 **Cursor dependency / security:** default fleet includes one cursor agent (`grok46`). Heavy fleet adds `fable51`, `k3max`, `g38flash`, `musespark`. Requires
 `cursor-agent` on PATH (herdr's canonical executable) and a logged-in Cursor account. Launch exports
@@ -108,6 +109,17 @@ and the TUI profile (`dsh plugin --profile dsh-tui add @deepseek-harness-tui/dsh
 Herdr 0.9 has no `--kind dsh`: launch `pane run`s `dsh --profile dsh-tui`, then
 sends the prompt with `pane send-text` + Enter. Missing `dsh`, the TUI profile,
 or the official key fails preflight hard (unless `--skip-model-preflight`).
+
+**Claude Code dependency / security:** default and heavy fleets include
+`opus55=claude:claude-opus-5-5:high`. Requires `claude` on PATH (Claude Code) and
+`claude auth status` logged in. Launch is `herdr agent start --kind claude` with
+`--model claude-opus-5-5 --effort high --dangerously-skip-permissions`.
+Opus 5.5's catalog default effort is **medium**, and per-model settings can pin
+medium too — do not omit `:high`. Do **not** pane-export the Cursor `37890` proxy
+for this seat (Claude Code uses its own settings proxy). Missing `claude` binary
+**drops that seat** and continues (GPU nodes have no Claude Code). A present
+`claude` that is logged out, or a model id missing from the local catalog cache,
+fails preflight hard (unless `--skip-model-preflight`).
 
 Override names/models when the user specifies others. Keep **stable short agent names**
 that stay unique after namespacing (see Name rules). If a default name collides with a live agent,
@@ -250,13 +262,14 @@ bash "$SKILL_DIR/launch.sh" \
   --cwd "$PWD" \
   --outdir /tmp/herdr-multi-my-review \
   --prompt-file /tmp/herdr-multi-my-review/prompt.txt
-  # omit --agent => fleet.defaults (usual four); optional --agent name=model ...
+  # omit --agent => fleet.defaults (usual five); optional --agent name=model ...
   # optional --agent grok46=cursor:cursor-grok-4.6-xhigh-fast  (mixed kind)
+  # optional --agent opus55=claude:claude-opus-5-5:high
   # optional --agent glm53=siliconflow/zai-org/GLM-5.3:max
   # optional --agent hy4prev=siliconflow/tencent/Hy4-preview:max
   # optional --agent fable51=cursor:claude-fable-5-1-thinking-high
   # optional --agent dsv4flash=dsh:deepseek-flash:max
-  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy eight / fleet.full
+  # optional --fleet-file "$SKILL_DIR/fleet.full"  => heavy nine / fleet.full
   # optional --fleet-file PATH  => custom name=model list
   # optional --skip-model-preflight
   # optional --serial-prompt  => wait for each prompt accept before the next
@@ -275,7 +288,7 @@ in `agents.json`) to avoid collisions with leftover agents. Short names stay sta
 Harvest validation uses `$SKILL_DIR/verdict_lib.py` (strict trailer; ignores prompt echoes).
 
 Default models live in `$SKILL_DIR/fleet.defaults` (edit, or override with `--agent` /
-`--fleet-file`). They are **examples** — every model id must already work in the caller's pi/cursor/codex/dsh config.
+`--fleet-file`). They are **examples** — every model id must already work in the caller's pi/cursor/claude/codex/dsh config.
 
 If the helper is missing or fails, follow the manual SOP below (same semantics).
 
@@ -371,13 +384,17 @@ herdr agent start "$herdr_name" --kind cursor --pane "$pane" --timeout 180000 --
 herdr agent start "$herdr_name" --kind codex --pane "$pane" --timeout 180000 -- \
   --model gpt-6-astra -c 'model_reasoning_effort="high"' \
   --dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust
+
+# claude code: no 37890 export. :high is required (Opus 5.5 saved effort is medium).
+herdr agent start "$herdr_name" --kind claude --pane "$pane" --timeout 180000 -- \
+  --model claude-opus-5-5 --effort high --dangerously-skip-permissions
 ```
 
 Notes:
 
 - `agent start` returns only after Herdr detects the expected agent and considers it ready (default
   start timeout 30s if you omit `--timeout`; this skill uses up to 180s, CLI max 300s).
-- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`; codex: `--model` + `-c model_reasoning_effort=...` + `--dangerously-bypass-approvals-and-sandbox` + `--dangerously-bypass-hook-trust`). Do not `pane run` the CLI — that returns before the TUI composer exists and `herdr agent prompt` dumps into the PTY. Preflight and start both use `cursor-agent`.
+- Pass **kind-native** args only after `--` for `agent start` (pi: `--session-dir`/`--name`; cursor: `--model`/`--trust`/`--force`; codex: `--model` + `-c model_reasoning_effort=...` + `--dangerously-bypass-approvals-and-sandbox` + `--dangerously-bypass-hook-trust`; claude: `--model` + `--effort` + `--dangerously-skip-permissions`). Do not `pane run` the CLI — that returns before the TUI composer exists and `herdr agent prompt` dumps into the PTY. Preflight and start both use `cursor-agent` for cursor seats and `claude` for Claude Code seats.
 - Cursor `--force` (= `--yolo` / UI "Run Everything") is required for unattended fleets; `--trust` alone
   still blocks on shell allowlist prompts. This is intentional blast-radius for mixed default fleets.
 - Mixed fleets are supported: each row in `agents.json` carries its own `kind`.

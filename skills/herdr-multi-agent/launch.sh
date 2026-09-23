@@ -37,6 +37,7 @@ Spec formats:
                                    #      dsv4flash=dsh:deepseek-flash:max
                                    #      glm53=siliconflow/zai-org/GLM-5.3:max
                                    #      hy4prev=siliconflow/tencent/Hy4-preview:max
+                                   #      opus55=claude:claude-opus-5-5:high
 
 Pi models must exist in the caller's pi config; cursor models are checked via
 `cursor-agent --list-models` (bare `agent` only if it is cursor-cli, not Grok).
@@ -46,6 +47,10 @@ HTTP(S)_PROXY/ALL_PROXY in the pane **once while it is still a shell**, then
 paste `export …` as a prompt). Canonical argv is `cursor-agent` / `codex`.
 Cursor: --trust --force. Codex: `--model` + `-c model_reasoning_effort=...`
 plus `--dangerously-bypass-approvals-and-sandbox --dangerously-bypass-hook-trust`.
+Claude Code: `herdr agent start --kind claude -- --model claude-opus-5-5 --effort high --dangerously-skip-permissions`.
+Do not pane-export 37890 for claude (it uses its own settings proxy). Opus 5.5's
+saved effort is medium, so the seat must pass `:high`. Missing `claude` drops
+that seat (GPU nodes); a present `claude` that is logged out fails preflight.
 Missing pi/cursor/codex/dsh CLIs required by the fleet fail preflight hard (unless skipped).
 dsh seats start `dsh --profile dsh-tui` in the pane (not herdr --kind, not headless).
 Herdr agent names are namespaced as <session-prefix>-<short-name> to avoid collisions.
@@ -265,6 +270,7 @@ PY
 model_preflight() {
   # Kind-aware preflight via fleet_lib:
   #   pi/cursor/codex missing CLI or list-models/login failure → hard fail (exit 3)
+  #   claude missing binary → drop that seat; logged-out claude → hard fail
   #   unknown kinds → WARN skip
   if [[ "$SKIP_MODEL_PREFLIGHT" -eq 1 ]]; then
     log "model preflight skipped"
@@ -306,7 +312,7 @@ if not kept:
     sys.exit(3)
 (outdir / "kept_specs.txt").write_text("\n".join(kept) + "\n")
 for k in skipped:
-    if k not in ("pi", "cursor", "codex", "dsh"):
+    if k not in ("pi", "cursor", "codex", "dsh", "claude"):
         print(f"WARN: no model preflight for kind={k}; continuing", file=sys.stderr)
 print("model_preflight_ok", len(kept), "skipped_kinds=", ",".join(skipped) or "-")
 PY
@@ -478,7 +484,7 @@ print("missing")' "$herdr_name" 2>/dev/null || echo missing)
       set -e
       # agent start already waits for interactive_ready. Extra enter on a ready
       # cursor composer can submit empty. Keep a short beat for other non-pi TUIs.
-      if [[ "$kind" != "pi" && "$kind" != "cursor" && "$kind" != "codex" ]]; then
+      if [[ "$kind" != "pi" && "$kind" != "cursor" && "$kind" != "codex" && "$kind" != "claude" ]]; then
         sleep 3
         herdr agent send-keys "$herdr_name" enter 2>/dev/null || true
         sleep 1

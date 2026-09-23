@@ -1,4 +1,4 @@
-# Default multi-model fleet for herdr-multi-agent — author's usual four (daily).
+# Default multi-model fleet for herdr-multi-agent — author's usual five (daily).
 #
 # Heavy / max-diversity list: see fleet.full (pass --fleet-file $SKILL_DIR/fleet.full).
 #
@@ -45,8 +45,10 @@
 #            2026-09-14 drop k3max + g38flash + musespark from daily: Cursor usage; keep fable51 only
 #            2026-09-15 heavy: drop mimopro; put k3max + g38flash + musespark in fleet.full only
 #            2026-09-16 drop gpt6astra; add grok46=cursor:cursor-grok-4.6-xhigh-fast
-#            2026-09-20 move fable51 to fleet.full only):
+#            2026-09-20 move fable51 to fleet.full only
+#            2026-09-23 opus55: Claude Code claude-opus-5-5 effort high):
 #   - Keep daily anchor: cursor grok 4.6 xhigh-fast
+#   - Daily Claude Code seat: opus55 (herdr --kind claude; not Cursor)
 #   - No Codex seat; gpt6astra is out of both fleets
 #   - Daily Cursor seat: grok46 only
 #   - Heavy extra Cursor seats: fable51 + k3max + g38flash + musespark (not in daily)
@@ -60,6 +62,9 @@
 
 # Cursor CLI via herdr agent start --kind cursor; pane export uppercase 37890; --trust --force
 grok46=cursor:cursor-grok-4.6-xhigh-fast
+# Claude Code via herdr agent start --kind claude. Catalog default effort is medium;
+# :high is required (do not inherit modelSettings). No 37890 pane-export.
+opus55=claude:claude-opus-5-5:high
 # dsh-TUI in a Herdr pane (not herdr --kind); official API deepseek-flash = V4.1 Flash
 dsv4flash=dsh:deepseek-flash:max
 glm53=siliconflow/zai-org/GLM-5.3:max

@@ -39,8 +39,8 @@ ln -sfn "$(pwd)/pi-herdr-multi-agent/skills/herdr-multi-agent" ~/.pi/agent/skill
 | `launch.sh` | Create tab, split panes, serial `agent start`, parallel prompt fanout (`--serial-prompt` to disable) |
 | `watchdog.sh` | Name-based poll + `VERDICT:` harvest; exits partial promptly on settled failures (never closes tabs) |
 | `close.sh` | Close the owned review tab after main-agent synthesis |
-| `fleet.defaults` | Author daily default — **usual four** (`name=provider/model[:thinking]` or `name=kind:model`) |
-| `fleet.full` | Author heavy profile — **heavy eight** / max diversity |
+| `fleet.defaults` | Author daily default — **usual five** (`name=provider/model[:thinking]` or `name=kind:model`) |
+| `fleet.full` | Author heavy profile — **heavy nine** / max diversity |
 | `fleet.example` | Copy-paste template for your own fleet |
 | `fleet_lib.py` | Shared kind:model parse, preflight match, start args |
 | `verdict_lib.py` | Strict `VERDICT:` trailer parse (shared by watchdog/close) |
@@ -86,8 +86,9 @@ bash "$SKILL_DIR/close.sh" --outdir "$OUTDIR"
 
 ## Default fleet
 
-Shipped `fleet.defaults` is the **author's usual four** (daily lean profile):
+Shipped `fleet.defaults` is the **author's usual five** (daily lean profile):
 
+- daily Claude Code seat: `opus55=claude:claude-opus-5-5:high` (effort high; not Cursor)
 - daily anchor: Cursor `cursor-grok-4.6-xhigh-fast`; heavy still includes Cursor `claude-fable-5-1-thinking-high`
 - No Codex seat; `gpt6astra` is out of both fleets
 - Daily Cursor seat: `grok46=cursor:cursor-grok-4.6-xhigh-fast`; heavy adds `fable51`, `k3max`, `g38flash`, `musespark`
@@ -99,7 +100,7 @@ Shipped `fleet.defaults` is the **author's usual four** (daily lean profile):
 - SiliconFlow daily seats: `glm53=siliconflow/zai-org/GLM-5.3:max` and `hy4prev=siliconflow/tencent/Hy4-preview:max`
 - `oxalpha`, `hy3`, `glm52`, `k27code`, `dsv4pro`, `dots3`, `g37flash`, `gpt56sol`, and `gpt6astra` are out of both fleets.
 
-Heavy / max-diversity **eight** lives in `fleet.full`:
+Heavy / max-diversity **nine** lives in `fleet.full`:
 
 ```bash
 bash "$SKILL_DIR/launch.sh" ... --fleet-file "$SKILL_DIR/fleet.full"
@@ -196,6 +197,7 @@ See `skills/herdr-multi-agent/SKILL.md` failure playbook for the full matrix.
 
 ### Unreleased (`main`)
 
+- Add daily/heavy `opus55=claude:claude-opus-5-5:high` (Claude Code harness, effort high). Daily is usual five, heavy is nine. Missing `claude` drops that seat.
 - Move `fable51` from daily to `fleet.full` only; daily is usual four, heavy still eight
 - Drop `gpt6astra` (Codex); add daily/heavy `grok46=cursor:cursor-grok-4.6-xhigh-fast`; daily still five, heavy still eight
 - Drop `mimopro` from heavy; put `k3max`, `g38flash`, `musespark` in `fleet.full` only; daily is usual five, heavy is eight

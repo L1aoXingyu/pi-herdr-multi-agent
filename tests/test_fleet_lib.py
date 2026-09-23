@@ -80,6 +80,8 @@ class ParseKindModelTests(unittest.TestCase):
         self.assertEqual((short, kind, model), ("gpt6astra", "codex", "gpt-6-astra:high"))
         short, kind, model = fl.parse_agent_spec("dsv4flash=dsh:deepseek-flash:max")
         self.assertEqual((short, kind, model), ("dsv4flash", "dsh", "deepseek-flash:max"))
+        short, kind, model = fl.parse_agent_spec("opus55=claude:claude-opus-5-5:high")
+        self.assertEqual((short, kind, model), ("opus55", "claude", "claude-opus-5-5:high"))
 
 
 class MatchModelTests(unittest.TestCase):
@@ -223,6 +225,40 @@ class StartArgsTests(unittest.TestCase):
                 "gemini-3.7-flash-high",
                 "--dangerously-skip-permissions",
             ],
+        )
+
+    def test_claude_args_split_effort_and_skip_permissions(self):
+        self.assertEqual(
+            fl.start_native_args(
+                "claude",
+                "claude-opus-5-5:high",
+                session_dir="/tmp/x/o",
+                herdr_name="rev-opus55",
+            ),
+            [
+                "--model",
+                "claude-opus-5-5",
+                "--effort",
+                "high",
+                "--dangerously-skip-permissions",
+            ],
+        )
+        self.assertEqual(
+            fl.split_claude_model_effort("claude-opus-5-5:high"),
+            ("claude-opus-5-5", "high"),
+        )
+        self.assertEqual(
+            fl.split_claude_model_effort("claude-opus-5-5:ultra"),
+            ("claude-opus-5-5:ultra", None),
+        )
+        self.assertIsNone(fl.claude_spec_error("claude-opus-5-5:high", {"claude-opus-5-5"}))
+        self.assertEqual(
+            fl.claude_spec_error("claude-opus-5-5:ultra", {"claude-opus-5-5"}),
+            "effort must be low|medium|high|xhigh|max",
+        )
+        self.assertEqual(
+            fl.claude_spec_error("nope", {"claude-opus-5-5"}),
+            "not in claude model catalog",
         )
 
 
